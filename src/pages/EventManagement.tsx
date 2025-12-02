@@ -272,18 +272,12 @@ export default function EventManagement() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Print Labels */}
+      {/* Print Label */}
       {printingGuest && (
-        <>
-          <div className="print-label label-page-break">
-            <div className="guest-name">{printingGuest.name}</div>
-            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
-          </div>
-          <div className="print-label">
-            <div className="guest-name">{printingGuest.name}</div>
-            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
-          </div>
-        </>
+        <div id="printable-area">
+          <div className="print-name">{printingGuest.name}</div>
+          {printingGuest.company && <div className="print-company">{printingGuest.company}</div>}
+        </div>
       )}
 
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
