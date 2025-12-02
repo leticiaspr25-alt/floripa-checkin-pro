@@ -98,69 +98,57 @@
   }
 }
 
-/* --- CSS DE IMPRESSÃO BLINDADO (V14) --- */
+/* Print styles for label printing */
 @media print {
-    /* 1. Limpa tudo */
-    body * { visibility: hidden; }
-    #root, .app-container { display: none !important; }
-    
-    /* 2. Configura a página para NÃO aceitar rotação automática */
-    @page {
-        size: 90mm 35mm; /* Tamanho exato */
-        margin: 0;       /* Zero margem */
-    }
+  @page {
+    size: 90mm 35mm;
+    margin: 0;
+  }
 
-    /* 3. Configura o corpo da impressão */
-    html, body {
-        width: 90mm;
-        height: 35mm;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: hidden !important; /* Proíbe vazar conteúdo */
-        background: white;
-    }
+  body * {
+    visibility: hidden;
+  }
 
-    /* 4. O container da etiqueta */
-    #printable-area {
-        visibility: visible !important;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 90mm;
-        height: 35mm;
-        background: white;
-        color: black;
-        display: flex !important;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        
-        /* O SEGREDO: Se o nome for grande, espreme ele, não gira a folha */
-        white-space: nowrap; 
-    }
+  .print-label,
+  .print-label * {
+    visibility: visible;
+  }
 
-    /* 5. Garante visibilidade dos filhos */
-    #printable-area * { visibility: visible !important; }
-}
+  .print-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 90mm;
+    height: 35mm;
+    background: white !important;
+    color: black !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2mm;
+    box-sizing: border-box;
+  }
 
-/* Estilo do Nome */
-.print-name {
-    font-size: 18pt;
-    font-weight: 900;
-    font-family: 'Arial Narrow', sans-serif; /* Fonte mais fina para caber mais */
-    line-height: 1.1;
-    margin-bottom: 2mm;
-    max-width: 88mm; /* Limite de segurança */
-    overflow: hidden; /* Corta se passar, não deixa girar */
-}
-
-/* Estilo da Empresa */
-.print-company {
-    font-size: 11pt;
-    font-family: Arial, sans-serif;
-    max-width: 88mm;
+  .print-label .guest-name {
+    font-size: 14pt;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.2;
+    max-width: 100%;
     overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .print-label .guest-company {
+    font-size: 10pt;
+    text-align: center;
+    margin-top: 2mm;
+  }
+
+  .label-page-break {
+    break-after: always;
+  }
 }
 
 /* Smooth scrollbar */
