@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-// --- INTERFACES ---
+// --- INTERFACES DE DADOS ---
 interface Event {
   id: string;
   name: string;
@@ -47,46 +47,46 @@ interface ActivityLog {
   details: string | null;
 }
 
-// --- COMPONENTE VISUAL: CAIXA DE UPLOAD (CORRIGIDO PARA UPLOAD REAL) ---
+// --- COMPONENTE VISUAL: CAIXA DE UPLOAD (COM UPLOAD REAL PARA STORAGE) ---
 function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?: 'qr-code' | 'image', previewUrl?: string | null, onUpload: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false); // Estado de carregamento
+  const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(true); // Ativa o spinner
+    setUploading(true);
     try {
-      // 1. Gera um nome único para o arquivo
+      // 1. Gera um nome único para o arquivo para evitar conflitos
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       
-      // 2. Envia para o Supabase Storage
+      // 2. Envia para o Supabase Storage (Bucket 'event-images')
       const { error: uploadError } = await supabase.storage
         .from('event-images')
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
-      // 3. Pega a URL pública do arquivo
+      // 3. Pega a URL pública do arquivo salvo
       const { data } = supabase.storage
         .from('event-images')
         .getPublicUrl(fileName);
 
-      // 4. Passa a URL real para o formulário
+      // 4. Devolve a URL para o formulário
       onUpload(data.publicUrl);
       toast({ title: "Sucesso", description: "Imagem carregada na nuvem!" });
 
     } catch (error: any) {
       console.error('Erro upload:', error);
-      // Fallback: Se der erro (ex: bucket não criado), usa preview local
+      // Fallback: Se o bucket não existir, usa preview local para não travar o usuário
       const url = URL.createObjectURL(file);
       onUpload(url);
-      toast({ title: "Aviso", description: "Usando modo offline (Verifique o Storage).", variant: "destructive" });
+      toast({ title: "Aviso", description: "Salvando localmente (Verifique se o Bucket 'event-images' existe e é público).", variant: "destructive" });
     } finally {
-      setUploading(false); // Desativa o spinner
+      setUploading(false);
     }
   };
 
@@ -98,9 +98,9 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
       <input type="file" hidden ref={inputRef} onChange={handleFileChange} accept="image/*" disabled={uploading} />
       
       {uploading ? (
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="text-xs text-muted-foreground">Enviando...</span>
+        <div className="flex flex-col items-center gap-2 text-primary">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="text-xs text-muted-foreground">Enviando imagem...</span>
         </div>
       ) : previewUrl ? (
         <div className="absolute inset-0 w-full h-full">
@@ -126,31 +126,31 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
   );
 }
 
-// --- COMPONENTE PRINCIPAL ---
+// --- COMPONENTE PRINCIPAL: GESTÃO DO EVENTO ---
 export default function EventManagement() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading, isAdmin, isEquipe } = useAuth();
   const { toast } = useToast();
   
-  // Estados de Dados
+  // Estados Principais
   const [event, setEvent] = useState<Event | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   
-  // Estados de UI
+  // Estados de UI e Loading
   const [loading, setLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Estados de Modal e Ações
+  // Estados dos Modais
   const [addGuestOpen, setAddGuestOpen] = useState(false);
   const [newGuest, setNewGuest] = useState({ name: '', company: '', role: '' });
   const [adding, setAdding] = useState(false);
   const [printingGuest, setPrintingGuest] = useState<Guest | null>(null);
 
-  // Estados de Configuração
+  // Estados de Configuração do Evento
   const [eventSettings, setEventSettings] = useState({
     name: '',
     date: '',
@@ -163,12 +163,13 @@ export default function EventManagement() {
   });
   const [photoMode, setPhotoMode] = useState<'auto' | 'upload'>('auto');
 
-  // Permissões
+  // Definição de Permissões (RBAC)
   const canImportExport = isAdmin || isEquipe;
-  const canDeleteGuests = isAdmin;
+  const canDeleteGuests = isAdmin; // Só Admin pode deletar
   const canAccessSettings = isAdmin || isEquipe;
   const canAccessHistory = isAdmin || isEquipe;
 
+  // --- FUNÇÃO DE LOG ---
   const logActivity = async (action: string, details: string) => {
     if (!user || !id) return;
     await supabase.from('activity_logs').insert({
@@ -180,6 +181,7 @@ export default function EventManagement() {
     });
   };
 
+  // --- INICIALIZAÇÃO E CARREGAMENTO ---
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
@@ -192,7 +194,6 @@ export default function EventManagement() {
     }
   }, [id, user]);
 
-  // --- CARREGAMENTO DE DADOS ---
   const fetchEvent = async () => {
     const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
     if (error || !data) {
@@ -210,6 +211,7 @@ export default function EventManagement() {
         photo_img_url: data.photo_img_url || '',
         layout_mode: (data.layout_mode as any) || 'standard',
       });
+      // Se já tiver imagem de foto, ativa modo upload
       if (data.photo_img_url) setPhotoMode('upload');
     }
     setLoading(false);
@@ -244,7 +246,7 @@ export default function EventManagement() {
     }).eq('id', guest.id);
 
     if (error) toast({ title: 'Erro', description: 'Falha ao atualizar check-in.', variant: 'destructive' });
-    else await logActivity(newCheckedIn ? 'Check-in' : 'Check-out', `${guest.name}${guest.company ? ` (${guest.company})` : ''}`);
+    else await logActivity(newCheckedIn ? 'Check-in' : 'Check-out', `${guest.name}`);
   };
 
   const handleAddGuest = async (e: React.FormEvent) => {
@@ -260,7 +262,8 @@ export default function EventManagement() {
     else {
       toast({ title: 'Sucesso', description: 'Convidado adicionado!' });
       await logActivity('Adicionou convidado', `${newGuest.name}`);
-      await fetchGuests(); // Atualiza lista na hora
+      // ATUALIZAÇÃO IMEDIATA DA LISTA
+      await fetchGuests();
       setAddGuestOpen(false);
       setNewGuest({ name: '', company: '', role: '' });
     }
@@ -273,7 +276,7 @@ export default function EventManagement() {
     if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' });
     else {
       await logActivity('Excluiu convidado', `${guest.name}`);
-      await fetchGuests(); // Atualiza lista na hora
+      await fetchGuests();
     }
   };
 
@@ -282,7 +285,7 @@ export default function EventManagement() {
     setTimeout(() => { window.print(); setPrintingGuest(null); }, 100);
   };
 
- // --- SUPER IMPORTADOR DE EXCEL (Aceita qualquer nome de coluna) ---
+  // --- SUPER IMPORTADOR DE EXCEL (Versão Inteligente e Robusta) ---
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canImportExport) return;
     const file = e.target.files?.[0];
@@ -290,74 +293,82 @@ export default function EventManagement() {
     
     const reader = new FileReader();
     reader.onload = async (evt) => {
-      const data = evt.target?.result;
-      const workbook = XLSX.read(data, { type: 'binary' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<any>(sheet);
+      try {
+        const data = evt.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        // Pega a primeira aba da planilha
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json<any>(sheet);
 
-      // LÓGICA INTELIGENTE: Procura qualquer coluna que pareça ser Nome/Empresa
-      const guestsToInsert = jsonData.map((row: any) => {
-        const keys = Object.keys(row);
+        // MAPEAMENTO INTELIGENTE DE COLUNAS
+        const guestsToInsert = jsonData.map((row: any) => {
+          const keys = Object.keys(row);
+          
+          // 1. Procura coluna de NOME (várias possibilidades)
+          const nameKey = keys.find(k => 
+            k.toLowerCase().includes('nome') || 
+            k.toLowerCase().includes('name') || 
+            k.toLowerCase().includes('participante') ||
+            k.toLowerCase().includes('convidado') ||
+            k.toLowerCase().includes('fullname')
+          );
+          
+          // 2. Procura coluna de EMPRESA
+          const companyKey = keys.find(k => 
+            k.toLowerCase().includes('empresa') || 
+            k.toLowerCase().includes('company') || 
+            k.toLowerCase().includes('organizacao') ||
+            k.toLowerCase().includes('instituicao') ||
+            k.toLowerCase().includes('org')
+          );
+          
+          // 3. Procura coluna de CARGO
+          const roleKey = keys.find(k => 
+            k.toLowerCase().includes('cargo') || 
+            k.toLowerCase().includes('role') || 
+            k.toLowerCase().includes('funcao') ||
+            k.toLowerCase().includes('ocupacao')
+          );
+
+          // Se não achou nome, pula essa linha
+          if (!nameKey) return null;
+
+          return {
+            event_id: id,
+            name: row[nameKey], 
+            company: companyKey ? row[companyKey] : null,
+            role: roleKey ? row[roleKey] : null,
+          };
+        }).filter((g: any) => g && g.name && g.name.toString().trim() !== '');
+
+        if (guestsToInsert.length === 0) {
+          toast({ title: 'Erro na Leitura', description: 'Não encontrei nenhuma coluna com "Nome" ou "Participante". Verifique o cabeçalho da planilha.', variant: 'destructive' });
+          return;
+        }
+
+        // Envia para o Supabase
+        const { error } = await supabase.from('guests').insert(guestsToInsert);
         
-        // 1. Acha a coluna do NOME (procurando por variações comuns)
-        const nameKey = keys.find(k => 
-          k.toLowerCase().includes('nome') || 
-          k.toLowerCase().includes('name') || 
-          k.toLowerCase().includes('participante') ||
-          k.toLowerCase().includes('convidado') ||
-          k.toLowerCase().includes('fullname')
-        );
-        
-        // 2. Acha a coluna da EMPRESA
-        const companyKey = keys.find(k => 
-          k.toLowerCase().includes('empresa') || 
-          k.toLowerCase().includes('company') || 
-          k.toLowerCase().includes('organizacao') ||
-          k.toLowerCase().includes('instituicao')
-        );
-        
-        // 3. Acha a coluna do CARGO
-        const roleKey = keys.find(k => 
-          k.toLowerCase().includes('cargo') || 
-          k.toLowerCase().includes('role') || 
-          k.toLowerCase().includes('funcao') ||
-          k.toLowerCase().includes('ocupacao')
-        );
-
-        // Se não tiver nome, ignora a linha
-        if (!nameKey) return null;
-
-        return {
-          event_id: id,
-          name: row[nameKey], 
-          company: companyKey ? row[companyKey] : null,
-          role: roleKey ? row[roleKey] : null,
-        };
-      }).filter((g: any) => g !== null && g.name); // Remove vazios
-
-      if (guestsToInsert.length === 0) {
-        toast({ title: 'Erro na Leitura', description: 'Não consegui identificar a coluna de nomes. Verifique se o cabeçalho da planilha tem "Nome", "Participante" ou similar.', variant: 'destructive' });
-        return;
-      }
-
-      const { error } = await supabase.from('guests').insert(guestsToInsert);
-      
-      if (error) {
-        console.error(error);
-        toast({ title: 'Erro', description: 'Falha ao salvar no banco de dados.', variant: 'destructive' });
-      } else {
-        toast({ title: 'Sucesso Total', description: `${guestsToInsert.length} convidados importados!` });
-        await logActivity('Importou convidados', `${guestsToInsert.length} via Excel`);
-        await fetchGuests(); // Atualiza a lista na hora
+        if (error) {
+          console.error(error);
+          toast({ title: 'Erro', description: 'Falha ao salvar no banco de dados.', variant: 'destructive' });
+        } else {
+          toast({ title: 'Sucesso Total', description: `${guestsToInsert.length} convidados importados com sucesso!` });
+          await logActivity('Importou convidados', `${guestsToInsert.length} via Excel`);
+          await fetchGuests(); // Atualiza a lista na hora
+        }
+      } catch (err) {
+        console.error("Erro ao processar arquivo:", err);
+        toast({ title: 'Erro no Arquivo', description: 'O arquivo não parece ser um Excel válido ou está corrompido.', variant: 'destructive' });
       }
     };
     reader.readAsBinaryString(file);
-    e.target.value = '';
+    e.target.value = ''; // Limpa o input para permitir importar o mesmo arquivo de novo se precisar
   };
-  // --- FUNÇÃO QUE ESTAVA FALTANDO: EXPORTAR EXCEL ---
+
+  // --- EXPORTAR PARA EXCEL ---
   const handleExportExcel = async () => {
     if (!canImportExport) return;
-    
     const exportData = guests.map(g => ({
       Nome: g.name, 
       Empresa: g.company || '', 
@@ -365,13 +376,15 @@ export default function EventManagement() {
       'Check-in': g.checked_in ? 'Sim' : 'Não',
       'Hora Check-in': g.checkin_time ? new Date(g.checkin_time).toLocaleString('pt-BR') : '',
     }));
-
+    
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Convidados');
-    XLSX.writeFile(wb, `${event?.name || 'evento'}_conv
+    XLSX.writeFile(wb, `${event?.name || 'evento'}_convidados.xlsx`);
+    await logActivity('Exportou convidados', 'Excel gerado');
+  };
 
-  // --- SALVAR CONFIGURAÇÕES ---
+  // --- SALVAR CONFIGURAÇÕES DO EVENTO ---
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canAccessSettings) return;
@@ -396,10 +409,10 @@ export default function EventManagement() {
     setSaving(false);
   };
 
-  // --- AUXILIARES ---
+  // --- FILTROS E FORMATAÇÃO ---
   const filteredGuests = guests.filter(g =>
     g.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    g.company?.toLowerCase().includes(searchTerm.toLowerCase())
+    (g.company && g.company.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const formatLogTime = (ts: string) => new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -409,10 +422,9 @@ export default function EventManagement() {
   return (
     <div className="min-h-screen bg-background">
       
-      {/* CORREÇÃO 2: CSS DE IMPRESSÃO COM FONTE FIXA */}
-     <style>{`
+      {/* --- CSS DE IMPRESSÃO (CORRIGIDO: FONTE 18pt + WRAP + CENTRALIZAÇÃO) --- */}
+      <style>{`
         @media print {
-          /* Configuração exata da página para não soltar papel em branco */
           @page { 
             size: 90mm 35mm; 
             margin: 0; 
@@ -420,7 +432,6 @@ export default function EventManagement() {
           
           body * { visibility: hidden; }
           
-          /* Garante que só a etiqueta apareça */
           .print-label, .print-label * { visibility: visible !important; }
           
           .print-label {
@@ -430,7 +441,6 @@ export default function EventManagement() {
             width: 90mm; 
             height: 35mm;
             
-            /* Centralização perfeita */
             display: flex; 
             flex-direction: column; 
             justify-content: center; 
@@ -440,28 +450,26 @@ export default function EventManagement() {
             background: white; 
             color: black;
             
-            /* Margem de segurança interna */
             padding: 2mm; 
             box-sizing: border-box;
-            overflow: hidden; /* Corta qualquer excesso que tentaria criar nova página */
+            overflow: hidden;
           }
           
           .label-page-break { page-break-after: always; }
           
-          /* ESTILO LINDO E FUNCIONAL */
+          /* Fonte 18pt: Grande, bonita e quebra linha se precisar */
           .guest-name {
-            font-family: 'Inter', sans-serif; /* Fonte moderna */
-            font-weight: 800; /* Negrito forte */
-            font-size: 14pt !important; /* Tamanho ideal: nem gigante, nem pequeno */
+            font-family: 'Inter', sans-serif; 
+            font-weight: 800; 
+            font-size: 18pt !important; 
             line-height: 1.1; 
             
-            /* Permite quebra de linha inteligente */
             width: 100%; 
-            white-space: normal; 
+            white-space: normal; /* Permite quebra de linha */
             word-wrap: break-word;
             
             margin-bottom: 1.5mm;
-            text-transform: uppercase; /* Caixa alta elegante */
+            text-transform: uppercase;
           }
           
           .guest-company {
@@ -469,7 +477,7 @@ export default function EventManagement() {
             font-weight: 500;
             font-size: 10pt !important; 
             width: 100%; 
-            white-space: nowrap; 
+            white-space: normal; 
             overflow: hidden; 
             text-overflow: ellipsis;
             color: #333;
@@ -477,6 +485,7 @@ export default function EventManagement() {
         }
       `}</style>
 
+      {/* ÁREA OCULTA DE IMPRESSÃO (Só aparece na hora de imprimir) */}
       {printingGuest && (
         <>
           <div className="print-label label-page-break">
@@ -490,7 +499,7 @@ export default function EventManagement() {
         </>
       )}
 
-      {/* Header */}
+      {/* HEADER DO SISTEMA */}
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -518,6 +527,7 @@ export default function EventManagement() {
 
           {/* === ABA 1: CONVIDADOS === */}
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
+            {/* Cards de Métricas */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-card border border-border rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div>
@@ -529,6 +539,7 @@ export default function EventManagement() {
               </div>
             </div>
 
+            {/* Barra de Ações (Busca, Importar, Exportar, Manual) */}
             <div className="flex flex-wrap gap-3 items-center">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -557,6 +568,7 @@ export default function EventManagement() {
               </Dialog>
             </div>
 
+            {/* Lista de Convidados */}
             <div className="space-y-3">
               {filteredGuests.length === 0 ? <div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div> : filteredGuests.map((guest, index) => (
                 <div key={guest.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{ animationDelay: `${index * 30}ms` }}>
@@ -605,66 +617,82 @@ export default function EventManagement() {
             <TabsContent value="settings" className="space-y-6 animate-fade-in">
               <form onSubmit={handleSaveSettings} className="space-y-8">
                 
+                {/* 1. SELETOR DE MODO DE LAYOUT */}
                 <div className="bg-secondary/50 border border-border rounded-xl p-6">
                   <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2"><LayoutTemplate className="h-5 w-5 text-primary" /> Modo de Exibição Pública</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'standard' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'standard'})}>
-                      <div className="font-bold text-foreground mb-1">Layout Padrão</div>
-                      <p className="text-xs text-muted-foreground">Sistema desenha a tela com SSID/Senha.</p>
+                      <div className="font-bold text-foreground mb-1">Layout Padrão (Automático)</div>
+                      <p className="text-xs text-muted-foreground">Você preenche SSID, Senha e Links. O sistema desenha a tela.</p>
                     </div>
                     <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'full_screen' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'full_screen'})}>
-                      <div className="font-bold text-foreground mb-1">Arte Digital</div>
-                      <p className="text-xs text-muted-foreground">Exibe apenas a imagem (100% da tela).</p>
+                      <div className="font-bold text-foreground mb-1">Arte Digital (Tela Cheia)</div>
+                      <p className="text-xs text-muted-foreground">Você sobe a imagem pronta (1920x1080). O sistema exibe só ela.</p>
                     </div>
                   </div>
                 </div>
 
+                {/* 2. DADOS BÁSICOS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2"><Label>Nome</Label><Input value={eventSettings.name} onChange={e=>setEventSettings({...eventSettings, name: e.target.value})} className="bg-card border-border" /></div>
-                  <div className="space-y-2"><Label>Data</Label><Input type="datetime-local" value={eventSettings.date} onChange={e=>setEventSettings({...eventSettings, date: e.target.value})} className="bg-card border-border" /></div>
+                  <div className="space-y-2"><Label>Nome do Evento</Label><Input value={eventSettings.name} onChange={e=>setEventSettings({...eventSettings, name: e.target.value})} className="bg-card border-border" required /></div>
+                  <div className="space-y-2"><Label>Data e Hora</Label><Input type="datetime-local" value={eventSettings.date} onChange={e=>setEventSettings({...eventSettings, date: e.target.value})} className="bg-card border-border" required /></div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* 3. CARD WI-FI */}
                   <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Wifi size={24} /></div><h3 className="text-lg font-bold">Display TV</h3></div>
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Wifi size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte TV / Tablet' : 'Conexão Wi-Fi'}</h3></div>
+                    
                     {eventSettings.layout_mode === 'standard' ? (
                       <div className="space-y-4">
-                        <div className="space-y-1"><Label>SSID</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div>
-                        <div className="space-y-1"><Label>Senha</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div>
+                        <div className="space-y-1"><Label>SSID (Nome da Rede)</Label><Input value={eventSettings.wifi_ssid} onChange={(e) => setEventSettings({ ...eventSettings, wifi_ssid: e.target.value })} className="bg-secondary border-border"/></div>
+                        <div className="space-y-1"><Label>Senha da Rede</Label><Input value={eventSettings.wifi_pass} onChange={(e) => setEventSettings({ ...eventSettings, wifi_pass: e.target.value })} className="bg-secondary border-border"/></div>
                         <div className="mt-4 pt-4 border-t border-border">
                           <Label className="block mb-3">QR Code do Wi-Fi</Label>
                           <UploadBox label="Arraste o QR Code" icon="qr-code" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4"><Label>Upload da Arte Horizontal</Label><UploadBox label="Arte Horizontal" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} /></div>
+                      <div className="space-y-4">
+                        <Label>Upload da Arte Horizontal (1920x1080)</Label>
+                        <UploadBox label="Arraste a Arte Pronta" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
+                        <p className="text-xs text-muted-foreground">Esta imagem vai para a rota /wifi</p>
+                      </div>
                     )}
                   </div>
 
+                  {/* 4. CARD MOMENTS */}
                   <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><ExternalLink size={24} /></div><h3 className="text-lg font-bold">Moments / Totem</h3></div>
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><ExternalLink size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte Totem Vertical' : 'Galeria Moments'}</h3></div>
+                    
                     {eventSettings.layout_mode === 'standard' ? (
                       <div className="space-y-4">
-                        <div className="space-y-1"><Label>Link Galeria Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border" placeholder="https://..." /></div>
+                        <div className="space-y-1"><Label>Link da Galeria</Label><Input value={eventSettings.photo_url} onChange={(e) => setEventSettings({ ...eventSettings, photo_url: e.target.value })} className="bg-secondary border-border" placeholder="https://..." /></div>
+                        
                         <div className="mt-4 pt-4 border-t border-border">
-                          <Label className="block mb-3">QR Code</Label>
+                          <Label className="block mb-3">Imagem do QR Code</Label>
                           <div className="flex gap-2 mb-4 p-1 bg-secondary rounded-lg border border-border">
-                            <button type="button" onClick={()=>setPhotoMode('auto')} className={`flex-1 py-2 text-xs font-bold rounded ${photoMode==='auto'?'bg-primary text-primary-foreground':'text-muted-foreground'}`}>AUTO</button>
-                            <button type="button" onClick={()=>setPhotoMode('upload')} className={`flex-1 py-2 text-xs font-bold rounded ${photoMode==='upload'?'bg-primary text-primary-foreground':'text-muted-foreground'}`}>UPLOAD</button>
+                            <button type="button" onClick={()=>setPhotoMode('auto')} className={`flex-1 py-2 text-xs font-bold rounded transition-colors ${photoMode==='auto'?'bg-primary text-primary-foreground':'text-muted-foreground hover:text-foreground'}`}>GERAR AUTO</button>
+                            <button type="button" onClick={()=>setPhotoMode('upload')} className={`flex-1 py-2 text-xs font-bold rounded transition-colors ${photoMode==='upload'?'bg-primary text-primary-foreground':'text-muted-foreground hover:text-foreground'}`}>UPLOAD</button>
                           </div>
                           <div className="h-64 flex items-center justify-center bg-background border-2 border-dashed border-border rounded-xl overflow-hidden">
                             {photoMode === 'auto' ? (
                               <div className="text-center p-4">
-                                {eventSettings.photo_url ? <div className="bg-white p-4 rounded-xl"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} alt="QR" className="w-[150px] h-[150px]" /></div> : <span className="text-muted-foreground text-sm">Cole o link</span>}
+                                {eventSettings.photo_url ? (
+                                  <div className="bg-white p-4 rounded-xl">
+                                    {/* USANDO API PÚBLICA PARA GERAR QR E EVITAR ERRO DE BIBLIOTECA */}
+                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} alt="QR" className="w-[150px] h-[150px]" />
+                                  </div>
+                                ) : <span className="text-muted-foreground text-sm">Cole o link acima</span>}
                               </div>
                             ) : (
-                              <div className="w-full h-full p-2"><UploadBox label="Capa" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
+                              <div className="w-full h-full p-2"><UploadBox label="Capa Personalizada" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
                             )}
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4"><Label>Upload da Arte Vertical</Label><UploadBox label="Arte Vertical" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
+                      <div className="space-y-4"><Label>Upload da Arte Vertical</Label><UploadBox label="Arraste a Arte Vertical" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
                     )}
                   </div>
                 </div>
