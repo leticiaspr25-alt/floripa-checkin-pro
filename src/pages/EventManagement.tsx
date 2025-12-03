@@ -282,52 +282,77 @@ export default function EventManagement() {
     setTimeout(() => { window.print(); setPrintingGuest(null); }, 100);
   };
 
-  // --- IMPORTAÇÃO / EXPORTAÇÃO EXCEL ---
+ // --- SUPER IMPORTADOR DE EXCEL (Aceita qualquer nome de coluna) ---
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canImportExport) return;
     const file = e.target.files?.[0];
     if (!file) return;
+    
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const data = evt.target?.result;
       const workbook = XLSX.read(data, { type: 'binary' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json<any>(sheet);
-      const guestsToInsert = jsonData.map((row: any) => ({
-        event_id: id,
-        name: row.nome || row.name || '',
-        company: row.empresa || row.company || null,
-        role: row.cargo || row.role || null,
-      })).filter((g: any) => g.name);
+
+      // LÓGICA INTELIGENTE: Procura qualquer coluna que pareça ser Nome/Empresa
+      const guestsToInsert = jsonData.map((row: any) => {
+        const keys = Object.keys(row);
+        
+        // 1. Acha a coluna do NOME (procurando por variações comuns)
+        const nameKey = keys.find(k => 
+          k.toLowerCase().includes('nome') || 
+          k.toLowerCase().includes('name') || 
+          k.toLowerCase().includes('participante') ||
+          k.toLowerCase().includes('convidado') ||
+          k.toLowerCase().includes('fullname')
+        );
+        
+        // 2. Acha a coluna da EMPRESA
+        const companyKey = keys.find(k => 
+          k.toLowerCase().includes('empresa') || 
+          k.toLowerCase().includes('company') || 
+          k.toLowerCase().includes('organizacao') ||
+          k.toLowerCase().includes('instituicao')
+        );
+        
+        // 3. Acha a coluna do CARGO
+        const roleKey = keys.find(k => 
+          k.toLowerCase().includes('cargo') || 
+          k.toLowerCase().includes('role') || 
+          k.toLowerCase().includes('funcao') ||
+          k.toLowerCase().includes('ocupacao')
+        );
+
+        // Se não tiver nome, ignora a linha
+        if (!nameKey) return null;
+
+        return {
+          event_id: id,
+          name: row[nameKey], 
+          company: companyKey ? row[companyKey] : null,
+          role: roleKey ? row[roleKey] : null,
+        };
+      }).filter((g: any) => g !== null && g.name); // Remove vazios
 
       if (guestsToInsert.length === 0) {
-        toast({ title: 'Erro', description: 'Nenhum convidado válido.', variant: 'destructive' });
+        toast({ title: 'Erro na Leitura', description: 'Não consegui identificar a coluna de nomes. Verifique se o cabeçalho da planilha tem "Nome", "Participante" ou similar.', variant: 'destructive' });
         return;
       }
+
       const { error } = await supabase.from('guests').insert(guestsToInsert);
-      if (error) toast({ title: 'Erro', description: 'Falha ao importar.', variant: 'destructive' });
-      else {
-        toast({ title: 'Sucesso', description: `${guestsToInsert.length} importados!` });
+      
+      if (error) {
+        console.error(error);
+        toast({ title: 'Erro', description: 'Falha ao salvar no banco de dados.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Sucesso Total', description: `${guestsToInsert.length} convidados importados!` });
         await logActivity('Importou convidados', `${guestsToInsert.length} via Excel`);
-        await fetchGuests();
+        await fetchGuests(); // Atualiza a lista na hora
       }
     };
     reader.readAsBinaryString(file);
     e.target.value = '';
-  };
-
-  const handleExportExcel = async () => {
-    if (!canImportExport) return;
-    const exportData = guests.map(g => ({
-      Nome: g.name, Empresa: g.company || '', Cargo: g.role || '',
-      'Check-in': g.checked_in ? 'Sim' : 'Não',
-      'Hora Check-in': g.checkin_time ? new Date(g.checkin_time).toLocaleString('pt-BR') : '',
-    }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Convidados');
-    XLSX.writeFile(wb, `${event?.name || 'evento'}_convidados.xlsx`);
-    await logActivity('Exportou convidados', 'Excel gerado');
   };
 
   // --- SALVAR CONFIGURAÇÕES ---
