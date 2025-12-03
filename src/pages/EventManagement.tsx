@@ -46,24 +46,52 @@ interface ActivityLog {
   details: string | null;
 }
 
-// --- FUNÇÃO AUXILIAR: PADRONIZAR NOME PARA CRACHÁ ---
-// Pega o primeiro nome e no máximo mais 2 sobrenomes para não quebrar o layout
+// --- FUNÇÃO DE FORMATAÇÃO INTELIGENTE (CORREÇÃO DO "DA") ---
 const formatNameForBadge = (fullName: string) => {
   if (!fullName) return "";
-  // Remove espaços extras e quebra em palavras
+  
+  const prepositions = ["da", "de", "do", "das", "dos", "e"];
+  
+  // 1. Limpa e divide
   const parts = fullName.trim().split(/\s+/);
   
-  // Se tiver até 3 nomes, mostra tudo (Ex: "Ana Maria Silva")
+  // Se for nome curto (até 3 palavras), exibe tudo e capitaliza
   if (parts.length <= 3) {
-    return fullName;
+    return parts.map((word, index) => {
+      const lower = word.toLowerCase();
+      if (prepositions.includes(lower) && index !== 0) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    }).join(' ');
+  }
+
+  // 2. Lógica para nomes longos: 1º Nome + até 2 Sobrenomes (ignorando 'da')
+  let formattedName = [];
+  let surnamesCount = 0;
+
+  for (let i = 0; i < parts.length; i++) {
+    let word = parts[i].toLowerCase();
+    
+    // Capitalização (Title Case)
+    if (!prepositions.includes(word) || i === 0) {
+      word = word.charAt(0).toUpperCase() + word.slice(1);
+    }
+
+    // Adiciona a palavra ao nome final
+    formattedName.push(word);
+
+    // Se NÃO for o primeiro nome e NÃO for preposição, conta como sobrenome
+    if (i > 0 && !prepositions.includes(word.toLowerCase())) {
+      surnamesCount++;
+    }
+
+    // Se já pegou 2 sobrenomes REAIS, para.
+    if (surnamesCount >= 2) break;
   }
   
-  // Se for maior, pega o primeiro + os 2 seguintes (Ex: "João da Silva Souza Oliveira" -> "João da Silva Souza")
-  // Você pode ajustar para pegar o PRIMEIRO e o ÚLTIMO se preferir: return `${parts[0]} ${parts[parts.length - 1]}`;
-  return parts.slice(0, 3).join(" ");
+  return formattedName.join(' ');
 };
 
-// --- COMPONENTE VISUAL: CAIXA DE UPLOAD ---
+// --- UPLOAD BOX ---
 function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?: 'qr-code' | 'image', previewUrl?: string | null, onUpload: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -72,24 +100,19 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
       const { error: uploadError } = await supabase.storage.from('event-images').upload(fileName, file);
       if (uploadError) throw uploadError;
-
       const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
       onUpload(data.publicUrl);
-      toast({ title: "Sucesso", description: "Imagem carregada." });
-
+      toast({ title: "Sucesso", description: "Imagem salva." });
     } catch (error: any) {
-      console.error('Erro upload:', error);
       const url = URL.createObjectURL(file);
       onUpload(url);
-      toast({ title: "Aviso", description: "Salvando localmente (Verifique o Storage).", variant: "destructive" });
+      toast({ title: "Aviso", description: "Salvando localmente.", variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -98,7 +121,7 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
   return (
     <div className="border-2 border-dashed border-border bg-card/50 rounded-xl h-48 flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all group relative overflow-hidden" onClick={() => !uploading && inputRef.current?.click()}>
       <input type="file" hidden ref={inputRef} onChange={handleFileChange} accept="image/*" disabled={uploading} />
-      {uploading ? <div className="flex flex-col items-center gap-2"><Loader2 className="h-8 w-8 animate-spin text-primary" /><span className="text-xs text-muted-foreground">Enviando...</span></div> : previewUrl ? <div className="absolute inset-0 w-full h-full"><img src={previewUrl} className="w-full h-full object-contain p-4" alt="Preview" /><div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm"><span className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-bold shadow-xl transform translate-y-2 group-hover:translate-y-0 transition-transform">Trocar Imagem</span></div></div> : <div className="flex flex-col items-center gap-3 text-muted-foreground group-hover:text-primary transition-colors"><div className="p-4 bg-secondary rounded-full group-hover:bg-primary/20 transition-colors">{icon === 'image' ? <ImageIcon size={28} /> : <Upload size={28} />}</div><div className="text-center"><span className="block text-sm font-bold uppercase tracking-widest">{label}</span><span className="text-xs opacity-60">Clique para selecionar</span></div></div>}
+      {uploading ? <div className="flex flex-col items-center gap-2"><Loader2 className="h-8 w-8 animate-spin text-primary" /><span className="text-xs text-muted-foreground">Enviando...</span></div> : previewUrl ? <div className="absolute inset-0 w-full h-full"><img src={previewUrl} className="w-full h-full object-contain p-4" alt="Preview" /><div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm"><span className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-bold shadow-xl transform translate-y-2 group-hover:translate-y-0 transition-transform">Trocar</span></div></div> : <div className="flex flex-col items-center gap-3 text-muted-foreground group-hover:text-primary transition-colors"><div className="p-4 bg-secondary rounded-full group-hover:bg-primary/20 transition-colors">{icon === 'image' ? <ImageIcon size={28} /> : <Upload size={28} />}</div><div className="text-center"><span className="block text-sm font-bold uppercase tracking-widest">{label}</span><span className="text-xs opacity-60">Clique para selecionar</span></div></div>}
     </div>
   );
 }
@@ -133,6 +156,7 @@ export default function EventManagement() {
 
   const canImportExport = isAdmin || isEquipe;
   const canDeleteGuests = isAdmin;
+  const canEditGuests = isAdmin || isEquipe;
   const canAccessSettings = isAdmin || isEquipe;
   const canAccessHistory = isAdmin || isEquipe;
 
@@ -172,18 +196,18 @@ export default function EventManagement() {
     e.preventDefault(); setAdding(true);
     const { error } = await supabase.from('guests').insert({ event_id: id, name: newGuest.name, company: newGuest.company || null, role: newGuest.role || null });
     if (error) toast({ title: 'Erro', description: 'Falha ao adicionar.', variant: 'destructive' }); 
-    else { toast({ title: 'Sucesso', description: 'Convidado adicionado!' }); await logActivity('Adicionou convidado', `${newGuest.name}`); await fetchGuests(); setAddGuestOpen(false); setNewGuest({ name: '', company: '', role: '' }); }
+    else { toast({ title: 'Sucesso', description: 'Convidado adicionado!' }); await logActivity('Adicionou', `${newGuest.name}`); await fetchGuests(); setAddGuestOpen(false); setNewGuest({ name: '', company: '', role: '' }); }
     setAdding(false);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!guestToEdit) return; setAdding(true);
     const { error } = await supabase.from('guests').update({ name: editFormData.name, company: editFormData.company || null, role: editFormData.role || null }).eq('id', guestToEdit.id);
-    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Convidado atualizado!' }); await logActivity('Editou convidado', `${editFormData.name}`); await fetchGuests(); setEditGuestOpen(false); setGuestToEdit(null); }
+    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Convidado atualizado!' }); await logActivity('Editou', `${editFormData.name}`); await fetchGuests(); setEditGuestOpen(false); setGuestToEdit(null); }
     setAdding(false);
   };
 
-  const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu convidado', `${guest.name}`); await fetchGuests(); } };
+  const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu', `${guest.name}`); await fetchGuests(); } };
   const handlePrint = (guest: Guest) => { setPrintingGuest(guest); setTimeout(() => { window.print(); setPrintingGuest(null); }, 100); };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,84 +251,36 @@ export default function EventManagement() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* CSS IMPRESSÃO BLINDADO */}
+      {/* CSS IMPRESSÃO CORRIGIDO: 14PT, SEM UPPERCASE */}
       <style>{`
         @media print {
-          @page { 
-            size: 90mm 35mm; 
-            margin: 0; 
-          }
-          
+          @page { size: 90mm 35mm; margin: 0; }
           body * { visibility: hidden; }
-          
           .print-label, .print-label * { visibility: visible !important; }
-          
           .print-label { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 90mm; 
-            height: 35mm;
-            
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            text-align: center; 
-            
-            background: white !important; /* Força Fundo Branco */
-            color: black !important; /* Força Texto Preto */
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact;
-            
-            padding: 0 3mm; 
-            box-sizing: border-box; 
-            overflow: hidden; 
+            position: fixed; top: 0; left: 0; width: 90mm; height: 35mm; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            background: white !important; color: black !important; text-align: center; 
+            padding: 0 3mm; box-sizing: border-box; overflow: hidden;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
-          
           .label-page-break { page-break-after: always; }
           
           .guest-name { 
-            font-family: 'Inter', sans-serif; 
-            font-weight: 800; 
-            font-size: 16pt !important; 
-            line-height: 1.1; 
-            width: 100%; 
-            
-            white-space: normal; /* Permite quebra */
-            word-wrap: break-word; 
-            
+            font-family: 'Inter', sans-serif; font-weight: 800; 
+            font-size: 14pt !important; /* TAMANHO 14pt */
+            line-height: 1.1; width: 100%; 
+            white-space: normal; word-wrap: break-word; 
             margin-bottom: 1.5mm; 
-            text-transform: uppercase; 
-            color: black !important;
+            /* CAIXA ALTA REMOVIDA */
           }
-          
           .guest-company { 
-            font-family: 'Inter', sans-serif; 
-            font-weight: 500; 
-            font-size: 10pt !important; 
-            width: 100%; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            color: black !important;
+            font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10pt !important; width: 100%; white-space: normal; overflow: hidden; text-overflow: ellipsis; color: #000; 
           }
         }
       `}</style>
 
-      {/* RENDERIZAÇÃO DA ETIQUETA COM NOME PADRONIZADO */}
-      {printingGuest && (
-        <>
-          <div className="print-label label-page-break">
-            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
-            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
-          </div>
-          <div className="print-label">
-            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
-            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
-          </div>
-        </>
-      )}
+      {printingGuest && <><div className="print-label label-page-break"><div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div><div className="print-label"><div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div></>}
 
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -336,7 +312,10 @@ export default function EventManagement() {
               <Dialog open={addGuestOpen} onOpenChange={setAddGuestOpen}><DialogTrigger asChild><Button variant="outline" className="border-border"><Plus className="h-4 w-4 mr-2" />Manual</Button></DialogTrigger><DialogContent className="bg-card border-border"><DialogHeader><DialogTitle>Adicionar Convidado</DialogTitle></DialogHeader><form onSubmit={handleAddGuest} className="space-y-4 mt-4"><Input placeholder="Nome" value={newGuest.name} onChange={e=>setNewGuest({...newGuest, name: e.target.value})} required className="bg-secondary border-border" /><Input placeholder="Empresa" value={newGuest.company} onChange={e=>setNewGuest({...newGuest, company: e.target.value})} className="bg-secondary border-border" /><Input placeholder="Cargo" value={newGuest.role} onChange={e=>setNewGuest({...newGuest, role: e.target.value})} className="bg-secondary border-border" /><Button type="submit" className="w-full bg-primary" disabled={adding}>Adicionar</Button></form></DialogContent></Dialog>
             </div>
             <div className="space-y-3">
-              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0"><Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }}><Pencil className="h-4 w-4"/></Button><Button variant="ghost" size="icon" onClick={()=>handlePrint(g)}><Printer className="h-4 w-4"/></Button>{canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
+              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">
+                {canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }} className="hover:text-primary"><Pencil className="h-4 w-4"/></Button>}
+                <Button variant="ghost" size="icon" onClick={()=>handlePrint(g)}><Printer className="h-4 w-4"/></Button>
+                {canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
             </div>
           </TabsContent>
 
@@ -381,6 +360,7 @@ export default function EventManagement() {
                       <div className="space-y-1"><Label>SSID Wi-Fi</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div>
                       <div className="space-y-1"><Label>Senha Wi-Fi</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div>
                       <div className="space-y-1"><Label>Link Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border"/></div>
+                      <p className="text-xs text-muted-foreground mt-2">Estes dados geram os QR Codes mobile.</p>
                     </div>
                   </div>
                 </div>
