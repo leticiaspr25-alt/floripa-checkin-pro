@@ -411,7 +411,7 @@ export default function EventManagement() {
           .guest-name {
             font-family: 'Inter', sans-serif; /* Fonte moderna */
             font-weight: 800; /* Negrito forte */
-            font-size: 16pt !important; /* Tamanho ideal: nem gigante, nem pequeno */
+            font-size: 14pt !important; /* Tamanho ideal: nem gigante, nem pequeno */
             line-height: 1.1; 
             
             /* Permite quebra de linha inteligente */
