@@ -3,187 +3,166 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, Copy, Camera, Wifi } from 'lucide-react';
-
-interface Event {
-  id: string;
-  name: string;
-  wifi_ssid: string | null;
-  wifi_pass: string | null;
-  photo_url: string | null;
-}
+import { Loader2, CheckCircle2, Camera, Wifi } from 'lucide-react';
 
 export default function GuestCheckin() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [checkinLoading, setCheckinLoading] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  
   const [name, setName] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [checkedIn, setCheckedIn] = useState(false);
-  const [guestName, setGuestName] = useState('');
+  const [company, setCompany] = useState('');
 
   useEffect(() => {
+    async function fetchEvent() {
+      if (!id) return;
+      const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
+      if (data) setEvent(data);
+      setLoading(false);
+    }
     fetchEvent();
   }, [id]);
 
-  const fetchEvent = async () => {
-    const { data } = await supabase
-      .from('events')
-      .select('id, name, wifi_ssid, wifi_pass, photo_url')
-      .eq('id', id)
-      .single();
-
-    setEvent(data);
-    setLoading(false);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    setSubmitting(true);
+    setCheckinLoading(true);
+    
+    // 1. Cria o convidado na lista (Auto Check-in)
+    const { error } = await supabase.from('guests').insert({
+      event_id: id,
+      name: name,
+      company: company || null,
+      checked_in: true, // Já marca como presente
+      checkin_time: new Date().toISOString()
+    });
 
-    // Check if guest exists
-    const { data: existingGuest } = await supabase
-      .from('guests')
-      .select('id, name')
-      .eq('event_id', id)
-      .ilike('name', name.trim())
-      .maybeSingle();
+    setCheckinLoading(false);
 
-    if (existingGuest) {
-      // Update existing guest
-      await supabase
-        .from('guests')
-        .update({
-          checked_in: true,
-          checkin_time: new Date().toISOString(),
-        })
-        .eq('id', existingGuest.id);
-
-      setGuestName(existingGuest.name);
+    if (error) {
+      toast({ title: "Erro", description: "Não foi possível realizar o check-in.", variant: "destructive" });
     } else {
-      // Create walk-in guest
-      const { data: newGuest } = await supabase
-        .from('guests')
-        .insert({
-          event_id: id,
-          name: name.trim(),
-          checked_in: true,
-          checkin_time: new Date().toISOString(),
-        })
-        .select('name')
-        .single();
-
-      setGuestName(newGuest?.name || name.trim());
-    }
-
-    setCheckedIn(true);
-    setSubmitting(false);
-  };
-
-  const copyPassword = () => {
-    if (event?.wifi_pass) {
-      navigator.clipboard.writeText(event.wifi_pass);
-      toast({ title: 'Copiado!', description: 'Senha copiada para a área de transferência.' });
+      setConfirmed(true);
+      // Log de atividade (Opcional)
+      await supabase.from('activity_logs').insert({
+        event_id: id,
+        action: 'Auto Check-in',
+        details: `${name} (Via Mobile)`
+      });
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#f37021]" /></div>;
 
-  if (!event) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <p className="text-muted-foreground text-lg">Evento não encontrado</p>
-      </div>
-    );
-  }
+  if (!event) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Evento não encontrado.</div>;
 
-  if (checkedIn) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-md text-center animate-fade-in">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-6">
-            <CheckCircle className="w-10 h-10 text-primary" />
+  return (
+    <div className="min-h-screen bg-black p-6 flex flex-col items-center justify-center">
+      
+      {/* TELA DE SUCESSO (PÓS CONFIRMAÇÃO) */}
+      {confirmed ? (
+        <div className="w-full max-w-md text-center space-y-8 animate-in fade-in zoom-in duration-500">
+          <div className="flex justify-center">
+            <div className="h-24 w-24 bg-green-500/10 rounded-full flex items-center justify-center">
+              <CheckCircle2 className="h-12 w-12 text-green-500" />
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Obrigado por comparecer!</h1>
-          <p className="text-2xl text-primary font-semibold mb-8">{guestName}</p>
+          
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Bem-vindo(a)!</h1>
+            <p className="text-xl text-[#f37021] font-semibold">{name}</p>
+            <p className="text-gray-400 mt-2">Seu check-in foi realizado com sucesso.</p>
+          </div>
 
-          {event.wifi_ssid && (
-            <div className="bg-card border border-border rounded-2xl p-6 mb-4 text-left animate-slide-in">
-              <div className="flex items-center gap-3 mb-4">
-                <Wifi className="h-5 w-5 text-primary" />
-                <span className="font-semibold text-foreground">Wi-Fi do Evento</span>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Rede</p>
-                  <p className="text-lg font-medium text-foreground">{event.wifi_ssid}</p>
+          <div className="space-y-4">
+            {/* BOTÃO MOMENTS (O QUE O USUÁRIO PEDIU) */}
+            {event.photo_url && (
+              <Button 
+                className="w-full py-8 text-lg font-bold bg-[#f37021] hover:bg-[#d95d10] shadow-[0_0_20px_rgba(243,112,33,0.3)] transition-all hover:scale-105 text-white"
+                onClick={() => window.open(event.photo_url, '_blank')}
+              >
+                <Camera className="mr-2 h-6 w-6" />
+                ACESSAR FOTOS NO MOMENTS
+              </Button>
+            )}
+
+            {/* CARD WI-FI */}
+            {(event.wifi_ssid || event.wifi_pass) && (
+              <div className="bg-[#1A1A1A] border border-[#333] rounded-xl p-6 text-left">
+                <div className="flex items-center gap-2 mb-4 text-gray-400">
+                  <Wifi className="h-5 w-5" />
+                  <span className="text-sm uppercase tracking-wider font-bold">Wi-Fi do Evento</span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Senha</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-lg font-medium text-foreground">{event.wifi_pass}</p>
-                    <Button variant="ghost" size="icon" onClick={copyPassword} className="h-8 w-8">
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Rede</p>
+                    <p className="text-white font-mono text-lg">{event.wifi_ssid || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Senha (Toque para copiar)</p>
+                    <p 
+                      className="text-[#f37021] font-mono text-xl font-bold cursor-pointer active:opacity-50"
+                      onClick={() => {
+                        navigator.clipboard.writeText(event.wifi_pass || '');
+                        toast({ title: "Copiado!", description: "Senha do Wi-Fi copiada." });
+                      }}
+                    >
+                      {event.wifi_pass || '-'}
+                    </p>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {event.photo_url && (
-            <Button
-              className="w-full bg-primary hover:bg-primary/90 h-16 text-xl font-bold uppercase tracking-wide"
-              onClick={() => window.open(event.photo_url!, '_blank')}
-            >
-              <Camera className="h-6 w-6 mr-3" />
-              ACESSAR FOTOS NO MOMENTS
-            </Button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-md animate-fade-in">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-primary" />
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-foreground">{event.name}</h1>
-          <p className="text-muted-foreground mt-2">Faça seu check-in</p>
+          
+          <p className="text-sm text-gray-600 mt-8">Floripa Square Eventos</p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            placeholder="Seu nome completo"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="h-14 text-lg bg-card border-border"
-            required
-            autoFocus
-          />
-          <Button
-            type="submit"
-            className="w-full h-14 text-lg bg-primary hover:bg-primary/90 glow-primary"
-            disabled={submitting || !name.trim()}
-          >
-            {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirmar Check-in'}
-          </Button>
-        </form>
-      </div>
+      ) : (
+        /* TELA DE CHECK-IN (FORMULÁRIO) */
+        <Card className="w-full max-w-md bg-[#1A1A1A] border-[#333]">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl text-white">{event.name}</CardTitle>
+            <CardDescription>Confirme sua presença para acessar</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCheckIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-gray-300">Seu Nome Completo</Label>
+                <Input 
+                  value={name} 
+                  onChange={e => setName(e.target.value)} 
+                  placeholder="Ex: João Silva" 
+                  className="bg-black border-[#333] text-white h-12 text-lg focus:border-[#f37021]"
+                  required 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-300">Empresa (Opcional)</Label>
+                <Input 
+                  value={company} 
+                  onChange={e => setCompany(e.target.value)} 
+                  placeholder="Ex: Floripa Square" 
+                  className="bg-black border-[#333] text-white focus:border-[#f37021]"
+                />
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full h-12 text-lg font-bold bg-[#f37021] hover:bg-[#d95d10] text-white"
+                disabled={checkinLoading}
+              >
+                {checkinLoading ? <Loader2 className="animate-spin" /> : 'CONFIRMAR PRESENÇA'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
