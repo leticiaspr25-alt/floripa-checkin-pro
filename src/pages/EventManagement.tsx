@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, Search, Upload, Plus, Download, Settings, 
-  Printer, Users, UserCheck, Loader2, ExternalLink, Trash2, Pencil,
-  Monitor, Wifi, History, Clock, Image as ImageIcon, Smartphone
+  Printer, Users, UserCheck, Loader2, ExternalLink, Trash2, 
+  Monitor, Wifi, History, Clock, Image as ImageIcon, LayoutTemplate,
+  Pencil // <--- ÍCONE DE EDIÇÃO ADICIONADO
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -27,6 +28,7 @@ interface Event {
   wifi_img_url: string | null;
   photo_url: string | null;
   photo_img_url: string | null;
+  layout_mode: 'standard' | 'full_screen' | null;
 }
 
 interface Guest {
@@ -61,14 +63,12 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       
-      // Upload para o Bucket
       const { error: uploadError } = await supabase.storage.from('event-images').upload(fileName, file);
       if (uploadError) throw uploadError;
 
-      // Pega URL Pública
       const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
       onUpload(data.publicUrl);
-      toast({ title: "Sucesso", description: "Imagem salva na nuvem." });
+      toast({ title: "Sucesso", description: "Imagem carregada." });
 
     } catch (error: any) {
       console.error('Erro upload:', error);
@@ -127,15 +127,15 @@ export default function EventManagement() {
   const [adding, setAdding] = useState(false);
   const [printingGuest, setPrintingGuest] = useState<Guest | null>(null);
 
-  // ESTADOS DE EDIÇÃO
+  // --- ESTADOS PARA EDIÇÃO ---
   const [editGuestOpen, setEditGuestOpen] = useState(false);
   const [guestToEdit, setGuestToEdit] = useState<Guest | null>(null);
   const [editFormData, setEditFormData] = useState({ name: '', company: '', role: '' });
 
-  // CONFIGURAÇÕES DO EVENTO
   const [eventSettings, setEventSettings] = useState({
-    name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: ''
+    name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: '', layout_mode: 'standard',
   });
+  const [photoMode, setPhotoMode] = useState<'auto' | 'upload'>('auto');
 
   const canImportExport = isAdmin || isEquipe;
   const canDeleteGuests = isAdmin;
@@ -152,121 +152,149 @@ export default function EventManagement() {
 
   const fetchEvent = async () => {
     const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
-    if (error || !data) { toast({ title: 'Erro', description: 'Evento não encontrado.', variant: 'destructive' }); navigate('/dashboard'); } 
-    else {
+    if (error || !data) {
+      toast({ title: 'Erro', description: 'Evento não encontrado.', variant: 'destructive' });
+      navigate('/dashboard');
+    } else {
       setEvent(data);
       setEventSettings({
         name: data.name, date: new Date(data.date).toISOString().slice(0, 16),
         wifi_ssid: data.wifi_ssid || '', wifi_pass: data.wifi_pass || '',
-        photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', photo_img_url: data.photo_img_url || ''
+        photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '',
+        photo_img_url: data.photo_img_url || '', layout_mode: (data.layout_mode as any) || 'standard',
       });
+      if (data.photo_img_url) setPhotoMode('upload');
     }
     setLoading(false);
   };
 
-  const fetchGuests = async () => { const { data, error } = await supabase.from('guests').select('*').eq('event_id', id).order('name'); if (!error) setGuests(data || []); };
-  const fetchActivityLogs = async () => { if (!canAccessHistory) return; setLogsLoading(true); const { data, error } = await supabase.from('activity_logs').select('*').eq('event_id', id).order('created_at', { ascending: false }).limit(100); if (!error) setActivityLogs(data || []); setLogsLoading(false); };
-  const subscribeToGuests = () => { const channel = supabase.channel('guests-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'guests', filter: `event_id=eq.${id}` }, () => fetchGuests()).subscribe(); return () => { supabase.removeChannel(channel); }; };
+  const fetchGuests = async () => {
+    const { data, error } = await supabase.from('guests').select('*').eq('event_id', id).order('name');
+    if (!error) setGuests(data || []);
+  };
+
+  const fetchActivityLogs = async () => {
+    if (!canAccessHistory) return;
+    setLogsLoading(true);
+    const { data, error } = await supabase.from('activity_logs').select('*').eq('event_id', id).order('created_at', { ascending: false }).limit(100);
+    if (!error) setActivityLogs(data || []);
+    setLogsLoading(false);
+  };
+
+  const subscribeToGuests = () => {
+    const channel = supabase.channel('guests-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'guests', filter: `event_id=eq.${id}` }, () => fetchGuests()).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  };
 
   const handleToggleCheckIn = async (guest: Guest) => {
     const newCheckedIn = !guest.checked_in;
     const { error } = await supabase.from('guests').update({ checked_in: newCheckedIn, checkin_time: newCheckedIn ? new Date().toISOString() : null }).eq('id', guest.id);
-    if (error) toast({ title: 'Erro', description: 'Falha ao atualizar.', variant: 'destructive' }); else await logActivity(newCheckedIn ? 'Check-in' : 'Check-out', `${guest.name}`);
+    if (error) toast({ title: 'Erro', description: 'Falha ao atualizar.', variant: 'destructive' });
+    else await logActivity(newCheckedIn ? 'Check-in' : 'Check-out', `${guest.name}`);
   };
 
   const handleAddGuest = async (e: React.FormEvent) => {
-    e.preventDefault(); setAdding(true);
+    e.preventDefault();
+    setAdding(true);
     const { error } = await supabase.from('guests').insert({ event_id: id, name: newGuest.name, company: newGuest.company || null, role: newGuest.role || null });
-    if (error) toast({ title: 'Erro', description: 'Falha ao adicionar.', variant: 'destructive' }); 
-    else { toast({ title: 'Sucesso', description: 'Convidado adicionado!' }); await logActivity('Adicionou convidado', `${newGuest.name}`); await fetchGuests(); setAddGuestOpen(false); setNewGuest({ name: '', company: '', role: '' }); }
+    if (error) toast({ title: 'Erro', description: 'Falha ao adicionar.', variant: 'destructive' });
+    else {
+      toast({ title: 'Sucesso', description: 'Convidado adicionado!' });
+      await logActivity('Adicionou convidado', `${newGuest.name}`);
+      await fetchGuests();
+      setAddGuestOpen(false); setNewGuest({ name: '', company: '', role: '' });
+    }
     setAdding(false);
   };
 
+  // --- FUNÇÃO DE SALVAR EDIÇÃO ---
   const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!guestToEdit) return; setAdding(true);
-    const { error } = await supabase.from('guests').update({ name: editFormData.name, company: editFormData.company || null, role: editFormData.role || null }).eq('id', guestToEdit.id);
-    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Convidado atualizado!' }); await logActivity('Editou convidado', `${editFormData.name}`); await fetchGuests(); setEditGuestOpen(false); setGuestToEdit(null); }
-    setAdding(false);
-  };
-
-  const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu convidado', `${guest.name}`); await fetchGuests(); } };
-  const handlePrint = (guest: Guest) => { setPrintingGuest(guest); setTimeout(() => { window.print(); setPrintingGuest(null); }, 100); };
-
-  // --- IMPORTAÇÃO INTELIGENTE (CORRIGIDA PARA SUA PLANILHA) ---
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canImportExport) return;
-    const file = e.target.files?.[0];
-    if (!file) return;
+    e.preventDefault();
+    if (!guestToEdit) return;
     
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const data = evt.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json<any>(sheet);
+    setAdding(true);
+    const { error } = await supabase.from('guests').update({
+      name: editFormData.name,
+      company: editFormData.company || null,
+      role: editFormData.role || null
+    }).eq('id', guestToEdit.id);
 
-        const guestsToInsert = jsonData.map((row: any) => {
-          const keys = Object.keys(row);
-          
-          // Procura a coluna 'Name', 'Nome', etc (Case Insensitive)
-          const nameKey = keys.find(k => k.toLowerCase().match(/(name|nome|participante|convidado|fullname)/));
-          // Procura coluna 'Company', 'Empresa', etc
-          const companyKey = keys.find(k => k.toLowerCase().match(/(company|empresa|organizacao|instituicao|org)/));
-          // Procura coluna 'Role', 'Cargo', etc
-          const roleKey = keys.find(k => k.toLowerCase().match(/(role|cargo|funcao|ocupacao)/));
-
-          if (!nameKey) return null;
-
-          return {
-            event_id: id,
-            name: row[nameKey], 
-            company: companyKey ? row[companyKey] : null,
-            role: roleKey ? row[roleKey] : null,
-          };
-        }).filter((g: any) => g && g.name); // Remove vazios
-
-        if (guestsToInsert.length === 0) {
-          toast({ title: 'Erro na Leitura', description: 'Não encontrei colunas válidas (Name, Nome, etc).', variant: 'destructive' });
-          return;
-        }
-
-        const { error } = await supabase.from('guests').insert(guestsToInsert);
-        
-        if (error) toast({ title: 'Erro', description: 'Falha ao salvar no banco.', variant: 'destructive' });
-        else {
-          toast({ title: 'Sucesso', description: `${guestsToInsert.length} convidados importados!` });
-          await logActivity('Importou convidados', 'Excel');
-          await fetchGuests();
-        }
-      } catch (err) {
-        toast({ title: 'Erro', description: 'Arquivo inválido.', variant: 'destructive' });
-      }
-    };
-    reader.readAsBinaryString(file);
-    e.target.value = '';
-  };
-
-  const handleExportExcel = async () => { if (!canImportExport) return; const ws = XLSX.utils.json_to_sheet(guests.map(g => ({ Nome: g.name, Empresa: g.company || '', Cargo: g.role || '', 'Check-in': g.checked_in ? 'Sim' : 'Não', 'Hora': g.checkin_time ? new Date(g.checkin_time).toLocaleString('pt-BR') : '' }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Convidados'); XLSX.writeFile(wb, `${event?.name}_convidados.xlsx`); await logActivity('Exportou', 'Excel'); };
-
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!canAccessSettings) return; setSaving(true);
-    const { error } = await supabase.from('events').update({
-      name: eventSettings.name, date: new Date(eventSettings.date).toISOString(),
-      wifi_ssid: eventSettings.wifi_ssid || null, wifi_pass: eventSettings.wifi_pass || null,
-      photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null, photo_img_url: eventSettings.photo_img_url || null
-    }).eq('id', id);
-    if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Salvo!' }); await logActivity('Atualizou configurações', 'Alterações salvas'); fetchEvent(); }
-    setSaving(false);
+    if (error) {
+      toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Sucesso', description: 'Convidado atualizado!' });
+      await logActivity('Editou convidado', `${editFormData.name}`);
+      await fetchGuests();
+      setEditGuestOpen(false);
+      setGuestToEdit(null);
+    }
+    setAdding(false);
   };
 
   const handleDeleteGuest = async (guest: Guest) => {
+    if (!canDeleteGuests) return;
     const { error } = await supabase.from('guests').delete().eq('id', guest.id);
     if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' });
     else { await logActivity('Excluiu convidado', `${guest.name}`); await fetchGuests(); }
   };
 
   const handlePrint = (guest: Guest) => { setPrintingGuest(guest); setTimeout(() => { window.print(); setPrintingGuest(null); }, 100); };
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canImportExport) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const data = evt.target?.result;
+      const workbook = XLSX.read(data, { type: 'binary' });
+      const jsonData = XLSX.utils.sheet_to_json<any>(workbook.Sheets[workbook.SheetNames[0]]);
+      
+      // Importação Inteligente
+      const guestsToInsert = jsonData.map((row: any) => {
+        const keys = Object.keys(row);
+        const nameKey = keys.find(k => k.toLowerCase().match(/(nome|name|participante|convidado|fullname)/));
+        const companyKey = keys.find(k => k.toLowerCase().match(/(empresa|company|organizacao|instituicao|org)/));
+        const roleKey = keys.find(k => k.toLowerCase().match(/(cargo|role|funcao|ocupacao)/));
+
+        if (!nameKey) return null;
+        return { event_id: id, name: row[nameKey], company: companyKey ? row[companyKey] : null, role: roleKey ? row[roleKey] : null };
+      }).filter((g: any) => g && g.name);
+
+      if (guestsToInsert.length === 0) { toast({ title: 'Erro', description: 'Não encontrei colunas válidas.', variant: 'destructive' }); return; }
+      
+      const { error } = await supabase.from('guests').insert(guestsToInsert);
+      if (error) toast({ title: 'Erro', description: 'Falha ao importar.', variant: 'destructive' });
+      else { toast({ title: 'Sucesso', description: `${guestsToInsert.length} importados!` }); await logActivity('Importou convidados', 'Excel'); await fetchGuests(); }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
+
+  const handleExportExcel = async () => {
+    if (!canImportExport) return;
+    const exportData = guests.map(g => ({ Nome: g.name, Empresa: g.company || '', Cargo: g.role || '', 'Check-in': g.checked_in ? 'Sim' : 'Não', 'Hora': g.checkin_time ? new Date(g.checkin_time).toLocaleString('pt-BR') : '' }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Convidados');
+    XLSX.writeFile(wb, `${event?.name || 'evento'}_convidados.xlsx`);
+    await logActivity('Exportou convidados', 'Excel');
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    const { error } = await supabase.from('events').update({
+      name: eventSettings.name, date: new Date(eventSettings.date).toISOString(),
+      wifi_ssid: eventSettings.wifi_ssid || null, wifi_pass: eventSettings.wifi_pass || null,
+      photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null,
+      photo_img_url: eventSettings.photo_img_url || null, layout_mode: eventSettings.layout_mode,
+    }).eq('id', id);
+    if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' });
+    else { toast({ title: 'Sucesso', description: 'Salvo!' }); fetchEvent(); }
+    setSaving(false);
+  };
+
   const filteredGuests = guests.filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.company?.toLowerCase().includes(searchTerm.toLowerCase()));
   const formatLogTime = (ts: string) => new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -274,28 +302,45 @@ export default function EventManagement() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* CSS Impressão */}
       <style>{`
         @media print {
           @page { size: 90mm 35mm; margin: 0; }
           body * { visibility: hidden; }
           .print-label, .print-label * { visibility: visible !important; }
-          .print-label { position: fixed; top: 0; left: 0; width: 90mm; height: 35mm; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; color: black; text-align: center; padding: 2mm; box-sizing: border-box; overflow: hidden; }
+          .print-label {
+            position: fixed; top: 0; left: 0; width: 90mm; height: 35mm;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: white; color: black; text-align: center; padding: 2mm; box-sizing: border-box; overflow: hidden;
+          }
           .label-page-break { page-break-after: always; }
-          /* AJUSTADO PARA 16PT (MÉDIO) */
-          .guest-name { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 16pt !important; line-height: 1.1; width: 100%; white-space: normal; word-wrap: break-word; margin-bottom: 1.5mm; text-transform: uppercase; }
-          .guest-company { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10pt !important; width: 100%; white-space: normal; overflow: hidden; text-overflow: ellipsis; color: #333; }
+          .guest-name {
+            font-family: 'Inter', sans-serif; font-weight: 800; font-size: 16pt !important;
+            line-height: 1.1; width: 100%; white-space: normal; word-wrap: break-word;
+            margin-bottom: 1.5mm; text-transform: uppercase;
+          }
+          .guest-company {
+            font-family: Arial, sans-serif; font-size: 10pt !important; width: 100%; white-space: normal; overflow: hidden; text-overflow: ellipsis; color: #333;
+          }
         }
       `}</style>
 
-      {printingGuest && <><div className="print-label label-page-break"><div className="guest-name">{printingGuest.name}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div><div className="print-label"><div className="guest-name">{printingGuest.name}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div></>}
+      {printingGuest && (
+        <>
+          <div className="print-label label-page-break"><div className="guest-name">{printingGuest.name}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div>
+          <div className="print-label"><div className="guest-name">{printingGuest.name}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div>
+        </>
+      )}
 
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4"><Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}><ArrowLeft className="h-5 w-5" /></Button><h1 className="text-lg font-semibold text-foreground truncate">{event?.name}</h1></div>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}><ArrowLeft className="h-5 w-5" /></Button>
+            <h1 className="text-lg font-semibold text-foreground truncate">{event?.name}</h1>
+          </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="border-border" onClick={() => window.open(`/totem/${id}`, '_blank')}><Monitor className="h-4 w-4 mr-2" />Totem</Button>
-            <Button variant="outline" size="sm" className="border-border" onClick={() => window.open(`/wifi/${id}`, '_blank')}><Wifi className="h-4 w-4 mr-2" />TV (12º)</Button>
-            <Button variant="outline" size="sm" className="border-border" onClick={() => window.open(`/wifi/${id}?view=qr`, '_blank')}><Smartphone className="h-4 w-4 mr-2" />Celular</Button>
+            <Button variant="outline" size="sm" className="border-border" onClick={() => window.open(`/wifi/${id}`, '_blank')}><Wifi className="h-4 w-4 mr-2" />Display TV</Button>
           </div>
         </div>
       </header>
@@ -313,13 +358,24 @@ export default function EventManagement() {
               <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold text-primary">{guests.length}</p></div>
               <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold text-primary">{guests.filter(g=>g.checked_in).length}</p></div>
             </div>
+
             <div className="flex flex-wrap gap-3 items-center">
-              <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar convidado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-card border-border" /></div>
+              <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-card border-border" /></div>
               {canImportExport && <><label className="cursor-pointer"><input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" /><Button variant="outline" className="border-border" asChild><span><Upload className="h-4 w-4 mr-2" />Importar</span></Button></label><Button variant="outline" className="border-border" onClick={handleExportExcel}><Download className="h-4 w-4 mr-2" />Exportar</Button></>}
               <Dialog open={addGuestOpen} onOpenChange={setAddGuestOpen}><DialogTrigger asChild><Button variant="outline" className="border-border"><Plus className="h-4 w-4 mr-2" />Manual</Button></DialogTrigger><DialogContent className="bg-card border-border"><DialogHeader><DialogTitle>Adicionar</DialogTitle></DialogHeader><form onSubmit={handleAddGuest} className="space-y-4 mt-4"><Input placeholder="Nome" value={newGuest.name} onChange={e=>setNewGuest({...newGuest, name: e.target.value})} required className="bg-secondary border-border" /><Input placeholder="Empresa" value={newGuest.company} onChange={e=>setNewGuest({...newGuest, company: e.target.value})} className="bg-secondary border-border" /><Input placeholder="Cargo" value={newGuest.role} onChange={e=>setNewGuest({...newGuest, role: e.target.value})} className="bg-secondary border-border" /><Button type="submit" className="w-full bg-primary" disabled={adding}>Adicionar</Button></form></DialogContent></Dialog>
             </div>
+
             <div className="space-y-3">
-              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0"><Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }}><Pencil className="h-4 w-4"/></Button><Button variant="ghost" size="icon" onClick={()=>handlePrint(g)}><Printer className="h-4 w-4"/></Button>{canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
+              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div>
+              <div className="flex items-center gap-3 shrink-0">
+                
+                {/* --- BOTÃO DE EDITAR (LÁPIS) --- */}
+                <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }} className="hover:text-primary"><Pencil className="h-4 w-4"/></Button>
+                
+                <Button variant="ghost" size="icon" onClick={()=>handlePrint(g)}><Printer className="h-4 w-4"/></Button>
+                {canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}
+                <Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/>
+              </div></div>))}
             </div>
           </TabsContent>
 
@@ -333,48 +389,67 @@ export default function EventManagement() {
           {canAccessSettings && (
             <TabsContent value="settings" className="space-y-6 animate-fade-in">
               <form onSubmit={handleSaveSettings} className="space-y-8">
-                
+                <div className="bg-secondary/50 border border-border rounded-xl p-6">
+                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2"><LayoutTemplate className="h-5 w-5 text-primary" /> Modo de Exibição Pública</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'standard' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'standard'})}><div className="font-bold text-foreground mb-1">Layout Padrão</div><p className="text-xs text-muted-foreground">Sistema desenha a tela com SSID/Senha.</p></div>
+                    <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'full_screen' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'full_screen'})}><div className="font-bold text-foreground mb-1">Arte Digital</div><p className="text-xs text-muted-foreground">Exibe apenas a imagem (100% da tela).</p></div>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2"><Label>Nome do Evento</Label><Input value={eventSettings.name} onChange={e=>setEventSettings({...eventSettings, name: e.target.value})} className="bg-card border-border" /></div>
+                  <div className="space-y-2"><Label>Nome</Label><Input value={eventSettings.name} onChange={e=>setEventSettings({...eventSettings, name: e.target.value})} className="bg-card border-border" /></div>
                   <div className="space-y-2"><Label>Data</Label><Input type="datetime-local" value={eventSettings.date} onChange={e=>setEventSettings({...eventSettings, date: e.target.value})} className="bg-card border-border" /></div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
-                  {/* TOTEM */}
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1">
-                    <div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Monitor className="text-primary" /><h3 className="font-bold">Totem (Térreo)</h3></div>
-                    <div className="text-sm text-muted-foreground p-4 bg-secondary/30 rounded-lg border border-border text-center">QR Code automático para check-in.</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Wifi size={24} /></div><h3 className="text-lg font-bold">Display TV</h3></div>
+                    {eventSettings.layout_mode === 'standard' ? (
+                      <div className="space-y-4">
+                        <div className="space-y-1"><Label>SSID</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div>
+                        <div className="space-y-1"><Label>Senha</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div>
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <Label className="block mb-3">QR Code do Wi-Fi</Label>
+                          <UploadBox label="Arraste o QR Code" icon="qr-code" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4"><Label>Upload da Arte Horizontal</Label><UploadBox label="Arte Horizontal" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} /></div>
+                    )}
                   </div>
-
-                  {/* TV */}
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1">
-                    <div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Wifi className="text-primary" /><h3 className="font-bold">TV (12º Andar)</h3></div>
-                    <div className="space-y-4">
-                      <Label>Arte Horizontal (1920x1080)</Label>
-                      <UploadBox label="Arraste a Arte da TV" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
-                    </div>
-                  </div>
-
-                  {/* CELULAR */}
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1">
-                    <div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Smartphone className="text-primary" /><h3 className="font-bold">Celular</h3></div>
-                    <div className="space-y-4">
-                      <Label>Arte Vertical (Mobile)</Label>
-                      <UploadBox label="Arraste a Arte do Celular" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} />
-                      <div className="space-y-1"><Label>SSID Wi-Fi</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div>
-                      <div className="space-y-1"><Label>Senha Wi-Fi</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div>
-                      <div className="space-y-1"><Label>Link Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border"/></div>
-                    </div>
+                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><ExternalLink size={24} /></div><h3 className="text-lg font-bold">Moments / Totem</h3></div>
+                    {eventSettings.layout_mode === 'standard' ? (
+                      <div className="space-y-4">
+                        <div className="space-y-1"><Label>Link Galeria Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border" placeholder="https://..." /></div>
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <Label className="block mb-3">QR Code</Label>
+                          <div className="flex gap-2 mb-4 p-1 bg-secondary rounded-lg border border-border">
+                            <button type="button" onClick={()=>setPhotoMode('auto')} className={`flex-1 py-2 text-xs font-bold rounded ${photoMode==='auto'?'bg-primary text-primary-foreground':'text-muted-foreground'}`}>AUTO</button>
+                            <button type="button" onClick={()=>setPhotoMode('upload')} className={`flex-1 py-2 text-xs font-bold rounded ${photoMode==='upload'?'bg-primary text-primary-foreground':'text-muted-foreground'}`}>UPLOAD</button>
+                          </div>
+                          <div className="h-64 flex items-center justify-center bg-background border-2 border-dashed border-border rounded-xl overflow-hidden">
+                            {photoMode === 'auto' ? (
+                              <div className="text-center p-4">
+                                {eventSettings.photo_url ? <div className="bg-white p-4 rounded-xl"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} alt="QR" className="w-[150px] h-[150px]" /></div> : <span className="text-muted-foreground text-sm">Cole o link</span>}
+                              </div>
+                            ) : (
+                              <div className="w-full h-full p-2"><UploadBox label="Capa" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4"><Label>Upload da Arte Vertical</Label><UploadBox label="Arte Vertical" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
+                    )}
                   </div>
                 </div>
-
-                <div className="pt-6 border-t border-border flex justify-end"><Button type="submit" className="bg-primary hover:bg-primary/90 px-8 py-6 h-auto text-lg" disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : 'Salvar Tudo'}</Button></div>
+                <div className="pt-6 border-t border-border flex justify-end"><Button type="submit" className="bg-primary hover:bg-primary/90" disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : 'Salvar'}</Button></div>
               </form>
             </TabsContent>
           )}
         </Tabs>
 
+        {/* --- NOVO MODAL DE EDIÇÃO --- */}
         <Dialog open={editGuestOpen} onOpenChange={setEditGuestOpen}>
           <DialogContent className="bg-card border-border">
             <DialogHeader><DialogTitle>Editar Convidado</DialogTitle></DialogHeader>
@@ -382,7 +457,7 @@ export default function EventManagement() {
               <div className="space-y-2"><Label>Nome *</Label><Input value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} required className="bg-secondary border-border" /></div>
               <div className="space-y-2"><Label>Empresa</Label><Input value={editFormData.company} onChange={(e) => setEditFormData({ ...editFormData, company: e.target.value })} className="bg-secondary border-border" /></div>
               <div className="space-y-2"><Label>Cargo</Label><Input value={editFormData.role} onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })} className="bg-secondary border-border" /></div>
-              <Button type="submit" className="w-full bg-primary" disabled={adding}>Salvar</Button>
+              <Button type="submit" className="w-full bg-primary" disabled={adding}>Salvar Alterações</Button>
             </form>
           </DialogContent>
         </Dialog>
