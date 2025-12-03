@@ -5,10 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, KeyRound, Save, Shield } from 'lucide-react';
+import type { Database } from '@/integrations/supabase/types';
+
+type AppRole = Database['public']['Enums']['app_role'];
 
 interface AccessCode {
   id: string;
-  role: string;
+  role: AppRole;
   code: string;
 }
 
@@ -47,7 +50,8 @@ export default function AccessCodeManagement() {
     setSaving(true);
 
     for (const code of codes) {
-      const newCode = editedCodes[code.role];
+      const roleKey = code.role as string;
+      const newCode = editedCodes[roleKey];
       if (newCode && newCode !== code.code) {
         const { error } = await supabase
           .from('access_codes')

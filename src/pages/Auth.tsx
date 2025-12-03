@@ -5,13 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Mail, Lock, Eye, EyeOff, User, KeyRound } from 'lucide-react';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [accessCode, setAccessCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, user } = useAuth();
@@ -40,7 +42,7 @@ export default function Auth() {
 
     const { error } = isLogin 
       ? await signIn(email, password)
-      : await signUp(email, password);
+      : await signUp(email, password, displayName, accessCode);
 
     if (error) {
       let message = error.message;
@@ -48,6 +50,8 @@ export default function Auth() {
         message = 'Email ou senha incorretos.';
       } else if (error.message.includes('User already registered')) {
         message = 'Este email já está cadastrado.';
+      } else if (error.message.includes('Código de acesso inválido')) {
+        message = error.message;
       }
       toast({
         title: 'Erro',
@@ -100,6 +104,24 @@ export default function Auth() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {!isLogin && (
+              <div className="space-y-2 animate-fade-in">
+                <Label htmlFor="displayName" className="text-foreground">Nome</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="displayName"
+                    type="text"
+                    placeholder="Seu nome completo"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="pl-10 bg-secondary border-border h-12"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground">Email</Label>
               <div className="relative">
@@ -141,27 +163,48 @@ export default function Auth() {
             </div>
 
             {!isLogin && (
-              <div className="space-y-2 animate-fade-in">
-                <Label htmlFor="confirmPassword" className="text-foreground">Confirmar Senha</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="confirmPassword"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10 bg-secondary border-border h-12"
-                    required
-                    minLength={6}
-                  />
+              <>
+                <div className="space-y-2 animate-fade-in">
+                  <Label htmlFor="confirmPassword" className="text-foreground">Confirmar Senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="confirmPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pl-10 bg-secondary border-border h-12"
+                      required
+                      minLength={6}
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div className="space-y-2 animate-fade-in">
+                  <Label htmlFor="accessCode" className="text-foreground">Código de Acesso</Label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="accessCode"
+                      type="text"
+                      placeholder="Digite o código fornecido"
+                      value={accessCode}
+                      onChange={(e) => setAccessCode(e.target.value)}
+                      className="pl-10 bg-secondary border-border h-12 font-mono"
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Solicite o código de acesso ao administrador do sistema.
+                  </p>
+                </div>
+              </>
             )}
 
             <Button
               type="submit"
-              className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground glow-primary"
+              className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
               disabled={loading}
             >
               {loading ? (
