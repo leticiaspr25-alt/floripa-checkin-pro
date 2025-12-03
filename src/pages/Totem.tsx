@@ -45,7 +45,6 @@ export default function Totem() {
       </div>
       
       <div className="bg-white p-6 rounded-3xl shadow-[0_0_120px_rgba(243,112,33,0.3)] mb-12 transform hover:scale-105 transition-transform duration-500">
-        {/* Usando API de QR Code para evitar erro de biblioteca */}
         <img 
            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + '/guest/' + id)}`} 
            className="w-[250px] h-[250px]"
