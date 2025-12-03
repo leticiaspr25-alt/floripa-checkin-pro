@@ -46,16 +46,13 @@ interface ActivityLog {
   details: string | null;
 }
 
-// --- FUNÇÃO DE FORMATAÇÃO INTELIGENTE (CORREÇÃO DO "DA") ---
+// --- FUNÇÃO DE NOME (Formatação Inteligente) ---
 const formatNameForBadge = (fullName: string) => {
   if (!fullName) return "";
-  
   const prepositions = ["da", "de", "do", "das", "dos", "e"];
-  
-  // 1. Limpa e divide
   const parts = fullName.trim().split(/\s+/);
   
-  // Se for nome curto (até 3 palavras), exibe tudo e capitaliza
+  // Se for curto, retorna formatado
   if (parts.length <= 3) {
     return parts.map((word, index) => {
       const lower = word.toLowerCase();
@@ -64,30 +61,20 @@ const formatNameForBadge = (fullName: string) => {
     }).join(' ');
   }
 
-  // 2. Lógica para nomes longos: 1º Nome + até 2 Sobrenomes (ignorando 'da')
+  // Se for longo, pega 1º nome + até 2 sobrenomes (ignorando 'da' como sobrenome)
   let formattedName = [];
   let surnamesCount = 0;
-
   for (let i = 0; i < parts.length; i++) {
     let word = parts[i].toLowerCase();
-    
-    // Capitalização (Title Case)
     if (!prepositions.includes(word) || i === 0) {
       word = word.charAt(0).toUpperCase() + word.slice(1);
     }
-
-    // Adiciona a palavra ao nome final
     formattedName.push(word);
-
-    // Se NÃO for o primeiro nome e NÃO for preposição, conta como sobrenome
     if (i > 0 && !prepositions.includes(word.toLowerCase())) {
       surnamesCount++;
     }
-
-    // Se já pegou 2 sobrenomes REAIS, para.
     if (surnamesCount >= 2) break;
   }
-  
   return formattedName.join(' ');
 };
 
@@ -203,12 +190,18 @@ export default function EventManagement() {
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!guestToEdit) return; setAdding(true);
     const { error } = await supabase.from('guests').update({ name: editFormData.name, company: editFormData.company || null, role: editFormData.role || null }).eq('id', guestToEdit.id);
-    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Convidado atualizado!' }); await logActivity('Editou', `${editFormData.name}`); await fetchGuests(); setEditGuestOpen(false); setGuestToEdit(null); }
+    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Atualizado!' }); await logActivity('Editou', `${editFormData.name}`); await fetchGuests(); setEditGuestOpen(false); setGuestToEdit(null); }
     setAdding(false);
   };
 
   const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu', `${guest.name}`); await fetchGuests(); } };
-  const handlePrint = (guest: Guest) => { setPrintingGuest(guest); setTimeout(() => { window.print(); setPrintingGuest(null); }, 100); };
+  
+  // --- LÓGICA DE IMPRESSÃO DUPLA AUTOMÁTICA ---
+  const handlePrint = (guest: Guest) => { 
+    setPrintingGuest(guest); 
+    // Pequeno delay para o React renderizar o HTML antes de chamar o print do navegador
+    setTimeout(() => { window.print(); setPrintingGuest(null); }, 300); 
+  };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canImportExport) return; const file = e.target.files?.[0]; if (!file) return;
@@ -251,36 +244,92 @@ export default function EventManagement() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* CSS IMPRESSÃO CORRIGIDO: 14PT, SEM UPPERCASE */}
+      
+      {/* --- CSS DE IMPRESSÃO BLINDADO --- */}
+      {/* Garante 90x35mm, remove margens e padroniza o texto */}
       <style>{`
         @media print {
-          @page { size: 90mm 35mm; margin: 0; }
-          body * { visibility: hidden; }
-          .print-label, .print-label * { visibility: visible !important; }
-          .print-label { 
-            position: fixed; top: 0; left: 0; width: 90mm; height: 35mm; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-            background: white !important; color: black !important; text-align: center; 
-            padding: 0 3mm; box-sizing: border-box; overflow: hidden;
-            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          /* Força tamanho e paisagem */
+          @page { 
+            size: 90mm 35mm landscape; 
+            margin: 0; 
           }
-          .label-page-break { page-break-after: always; }
+          
+          body * { visibility: hidden; }
+          
+          .print-label, .print-label * { visibility: visible !important; }
+          
+          .print-label { 
+            position: relative;
+            width: 90mm; 
+            height: 35mm; 
+            
+            /* Layout Flex para Centralização Perfeita */
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            text-align: center; 
+            
+            background: white !important; 
+            color: black !important; 
+            
+            /* Ajustes finos de margem */
+            padding: 0 4mm; 
+            box-sizing: border-box; 
+            overflow: hidden;
+            page-break-after: always; /* Garante que a proxima comece nova */
+          }
+          
+          /* Remove page-break do último para não soltar papel extra no fim */
+          .print-container .print-label:last-child {
+            page-break-after: auto;
+          }
           
           .guest-name { 
-            font-family: 'Inter', sans-serif; font-weight: 800; 
-            font-size: 14pt !important; /* TAMANHO 14pt */
-            line-height: 1.1; width: 100%; 
-            white-space: normal; word-wrap: break-word; 
-            margin-bottom: 1.5mm; 
-            /* CAIXA ALTA REMOVIDA */
+            font-family: 'Inter', sans-serif; 
+            font-weight: 800; 
+            font-size: 14pt !important; /* Tamanho Pedido */
+            line-height: 1.1; 
+            width: 100%; 
+            
+            /* Permite quebra de linha controlada */
+            white-space: normal; 
+            word-wrap: break-word; 
+            
+            margin-bottom: 1mm; 
+            /* Uppercase foi removido conforme pedido */
           }
+          
           .guest-company { 
-            font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10pt !important; width: 100%; white-space: normal; overflow: hidden; text-overflow: ellipsis; color: #000; 
+            font-family: 'Inter', sans-serif; 
+            font-weight: 500; 
+            font-size: 9pt !important; 
+            width: 100%; 
+            white-space: normal; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            color: #000; 
           }
         }
       `}</style>
 
-      {printingGuest && <><div className="print-label label-page-break"><div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div><div className="print-label"><div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div></>}
+      {/* RENDERIZAÇÃO DUPLA (FRENTE E VERSO) */}
+      {printingGuest && (
+        <div className="print-container">
+          {/* ETIQUETA 1 (FRENTE) */}
+          <div className="print-label">
+            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
+            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
+          </div>
+          
+          {/* ETIQUETA 2 (VERSO) - IGUAL A PRIMEIRA */}
+          <div className="print-label">
+            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
+            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
+          </div>
+        </div>
+      )}
 
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -313,7 +362,7 @@ export default function EventManagement() {
             </div>
             <div className="space-y-3">
               {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">
-                {canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }} className="hover:text-primary"><Pencil className="h-4 w-4"/></Button>}
+                {canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }}><Pencil className="h-4 w-4"/></Button>}
                 <Button variant="ghost" size="icon" onClick={()=>handlePrint(g)}><Printer className="h-4 w-4"/></Button>
                 {canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
             </div>
@@ -333,36 +382,10 @@ export default function EventManagement() {
                   <div className="space-y-2"><Label>Nome do Evento</Label><Input value={eventSettings.name} onChange={e=>setEventSettings({...eventSettings, name: e.target.value})} className="bg-card border-border" /></div>
                   <div className="space-y-2"><Label>Data</Label><Input type="datetime-local" value={eventSettings.date} onChange={e=>setEventSettings({...eventSettings, date: e.target.value})} className="bg-card border-border" /></div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* TOTEM */}
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1">
-                    <div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Monitor className="text-primary" /><h3 className="font-bold">Totem (Térreo)</h3></div>
-                    <div className="text-sm text-muted-foreground p-4 bg-secondary/30 rounded-lg border border-border text-center"><QrCode className="mx-auto mb-2 opacity-50" size={32} />Gera QR Code automático para check-in. (Sem upload)</div>
-                  </div>
-
-                  {/* TV */}
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1">
-                    <div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Wifi className="text-primary" /><h3 className="font-bold">TV (12º Andar)</h3></div>
-                    <div className="space-y-4">
-                      <Label>Arte Horizontal (1920x1080)</Label>
-                      <UploadBox label="Arraste a Arte da TV" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
-                      <p className="text-xs text-muted-foreground">Esta imagem aparecerá na TV.</p>
-                    </div>
-                  </div>
-
-                  {/* CELULAR */}
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1">
-                    <div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Smartphone className="text-primary" /><h3 className="font-bold">Celular / Dados</h3></div>
-                    <div className="space-y-4">
-                      <Label>Arte Vertical (Mobile)</Label>
-                      <UploadBox label="Arraste a Arte do Celular" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} />
-                      <div className="space-y-1"><Label>SSID Wi-Fi</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div>
-                      <div className="space-y-1"><Label>Senha Wi-Fi</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div>
-                      <div className="space-y-1"><Label>Link Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border"/></div>
-                      <p className="text-xs text-muted-foreground mt-2">Estes dados geram os QR Codes mobile.</p>
-                    </div>
-                  </div>
+                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1"><div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Monitor className="text-primary" /><h3 className="font-bold">Totem (Térreo)</h3></div><div className="text-sm text-muted-foreground p-4 bg-secondary/30 rounded-lg border border-border text-center"><QrCode className="mx-auto mb-2 opacity-50" size={32} />Gera QR Code automático para check-in. (Sem upload)</div></div>
+                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1"><div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Wifi className="text-primary" /><h3 className="font-bold">TV (12º Andar)</h3></div><div className="space-y-4"><Label>Arte Horizontal (1920x1080)</Label><UploadBox label="Arraste a Arte da TV" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} /><p className="text-xs text-muted-foreground">Esta imagem aparecerá na TV.</p></div></div>
+                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1"><div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Smartphone className="text-primary" /><h3 className="font-bold">Celular / Dados</h3></div><div className="space-y-4"><Label>Arte Vertical (Mobile)</Label><UploadBox label="Arraste a Arte do Celular" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /><div className="space-y-1"><Label>SSID Wi-Fi</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div><div className="space-y-1"><Label>Senha Wi-Fi</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div><div className="space-y-1"><Label>Link Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border"/></div></div></div>
                 </div>
                 <div className="pt-6 border-t border-border flex justify-end"><Button type="submit" className="bg-primary hover:bg-primary/90 px-8 py-6 h-auto text-lg" disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : 'Salvar Tudo'}</Button></div>
               </form>
