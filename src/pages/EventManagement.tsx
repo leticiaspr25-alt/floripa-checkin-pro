@@ -46,13 +46,14 @@ interface ActivityLog {
   details: string | null;
 }
 
-// --- FUNÇÃO DE NOME (Formatação Inteligente) ---
+// --- FUNÇÃO DE NOME INTELIGENTE (ENCURTA MAS MANTÉM 1 LINHA) ---
 const formatNameForBadge = (fullName: string) => {
   if (!fullName) return "";
+  
   const prepositions = ["da", "de", "do", "das", "dos", "e"];
   const parts = fullName.trim().split(/\s+/);
   
-  // Se for curto, retorna formatado
+  // Se for curto, mostra tudo formatado
   if (parts.length <= 3) {
     return parts.map((word, index) => {
       const lower = word.toLowerCase();
@@ -61,20 +62,31 @@ const formatNameForBadge = (fullName: string) => {
     }).join(' ');
   }
 
-  // Se for longo, pega 1º nome + até 2 sobrenomes (ignorando 'da' como sobrenome)
+  // Lógica: 1º Nome + até 2 Sobrenomes (ignorando 'da' na contagem)
   let formattedName = [];
   let surnamesCount = 0;
+
   for (let i = 0; i < parts.length; i++) {
     let word = parts[i].toLowerCase();
+    
+    // Capitaliza (Title Case)
+    let displayWord = word;
     if (!prepositions.includes(word) || i === 0) {
-      word = word.charAt(0).toUpperCase() + word.slice(1);
+      displayWord = word.charAt(0).toUpperCase() + word.slice(1);
+    } else {
+      displayWord = word;
     }
-    formattedName.push(word);
-    if (i > 0 && !prepositions.includes(word.toLowerCase())) {
+
+    formattedName.push(displayWord);
+
+    // Só conta como "sobrenome gasto" se não for preposição
+    if (i > 0 && !prepositions.includes(word)) {
       surnamesCount++;
     }
+
     if (surnamesCount >= 2) break;
   }
+  
   return formattedName.join(' ');
 };
 
@@ -87,6 +99,7 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -190,18 +203,12 @@ export default function EventManagement() {
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!guestToEdit) return; setAdding(true);
     const { error } = await supabase.from('guests').update({ name: editFormData.name, company: editFormData.company || null, role: editFormData.role || null }).eq('id', guestToEdit.id);
-    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Atualizado!' }); await logActivity('Editou', `${editFormData.name}`); await fetchGuests(); setEditGuestOpen(false); setGuestToEdit(null); }
+    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Convidado atualizado!' }); await logActivity('Editou', `${editFormData.name}`); await fetchGuests(); setEditGuestOpen(false); setGuestToEdit(null); }
     setAdding(false);
   };
 
   const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu', `${guest.name}`); await fetchGuests(); } };
-  
-  // --- LÓGICA DE IMPRESSÃO DUPLA AUTOMÁTICA ---
-  const handlePrint = (guest: Guest) => { 
-    setPrintingGuest(guest); 
-    // Pequeno delay para o React renderizar o HTML antes de chamar o print do navegador
-    setTimeout(() => { window.print(); setPrintingGuest(null); }, 300); 
-  };
+  const handlePrint = (guest: Guest) => { setPrintingGuest(guest); setTimeout(() => { window.print(); setPrintingGuest(null); }, 100); };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canImportExport) return; const file = e.target.files?.[0]; if (!file) return;
@@ -244,92 +251,45 @@ export default function EventManagement() {
 
   return (
     <div className="min-h-screen bg-background">
-      
-      {/* --- CSS DE IMPRESSÃO BLINDADO --- */}
-      {/* Garante 90x35mm, remove margens e padroniza o texto */}
+      {/* CSS IMPRESSÃO: NOME EM 1 LINHA, TAMANHO 14PT */}
       <style>{`
         @media print {
-          /* Força tamanho e paisagem */
-          @page { 
-            size: 90mm 35mm landscape; 
-            margin: 0; 
-          }
-          
+          @page { size: 90mm 35mm; margin: 0; }
           body * { visibility: hidden; }
-          
-          .print-label, .print-label * { visibility: visible !important; }
-          
+          .print-label, .print-label * { 
+            visibility: visible !important; 
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
           .print-label { 
-            position: relative;
-            width: 90mm; 
-            height: 35mm; 
-            
-            /* Layout Flex para Centralização Perfeita */
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            text-align: center; 
-            
-            background: white !important; 
-            color: black !important; 
-            
-            /* Ajustes finos de margem */
-            padding: 0 4mm; 
-            box-sizing: border-box; 
-            overflow: hidden;
-            page-break-after: always; /* Garante que a proxima comece nova */
+            position: fixed; top: 0; left: 0; width: 90mm; height: 35mm; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            background: white !important; color: black !important; text-align: center; 
+            padding: 0 3mm; box-sizing: border-box; overflow: hidden;
           }
-          
-          /* Remove page-break do último para não soltar papel extra no fim */
-          .print-container .print-label:last-child {
-            page-break-after: auto;
-          }
+          .label-page-break { page-break-after: always; }
           
           .guest-name { 
-            font-family: 'Inter', sans-serif; 
-            font-weight: 800; 
-            font-size: 14pt !important; /* Tamanho Pedido */
-            line-height: 1.1; 
-            width: 100%; 
-            
-            /* Permite quebra de linha controlada */
-            white-space: normal; 
-            word-wrap: break-word; 
-            
-            margin-bottom: 1mm; 
-            /* Uppercase foi removido conforme pedido */
+            font-family: 'Inter', sans-serif; font-weight: 800; 
+            font-size: 14pt !important; 
+            line-height: 1.1; width: 100%; 
+            white-space: nowrap !important; /* FORÇA 1 LINHA */
+            overflow: hidden; text-overflow: ellipsis; 
+            margin-bottom: 1.5mm; 
+            color: black !important;
+            /* Sem Uppercase */
           }
           
           .guest-company { 
-            font-family: 'Inter', sans-serif; 
-            font-weight: 500; 
-            font-size: 9pt !important; 
-            width: 100%; 
-            white-space: normal; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            color: #000; 
+            font-family: 'Inter', sans-serif; font-weight: 500; 
+            font-size: 10pt !important; width: 100%; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+            color: black !important;
+            /* Se estiver vazio, o div colapsa e o nome fica centralizado */
           }
         }
       `}</style>
 
-      {/* RENDERIZAÇÃO DUPLA (FRENTE E VERSO) */}
-      {printingGuest && (
-        <div className="print-container">
-          {/* ETIQUETA 1 (FRENTE) */}
-          <div className="print-label">
-            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
-            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
-          </div>
-          
-          {/* ETIQUETA 2 (VERSO) - IGUAL A PRIMEIRA */}
-          <div className="print-label">
-            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
-            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
-          </div>
-        </div>
-      )}
+      {printingGuest && <><div className="print-label label-page-break"><div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div><div className="print-label"><div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div></>}
 
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
