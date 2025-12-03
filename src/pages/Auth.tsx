@@ -101,7 +101,7 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-black p-4">
       <Card className="w-full max-w-md bg-[#1A1A1A] border-[#333] text-white">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center text-[#f37021]">Floripa Event Manager</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center text-[#f37021]">Rooftop Event Manager</CardTitle>
           <CardDescription className="text-center text-gray-400">Acesse o sistema para gerenciar</CardDescription>
         </CardHeader>
         <CardContent>
@@ -193,29 +193,6 @@ export default function Auth() {
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Confirmar Senha com Olhinho */}
-                <div className="space-y-2">
-                  <Label>Confirmar Senha</Label>
-                  <div className="relative">
-                    <Input 
-                      type={showConfirmPassword ? "text" : "password"} 
-                      value={confirmPassword} 
-                      onChange={e=>setConfirmPassword(e.target.value)} 
-                      required 
-                      className="bg-black border-[#333] text-white focus:border-[#f37021] pr-10" 
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-white"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
