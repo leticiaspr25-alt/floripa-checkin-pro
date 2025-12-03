@@ -1,163 +1,113 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Eye, EyeOff, KeyRound, Save, Shield } from 'lucide-react';
-import type { Database } from '@/integrations/supabase/types';
-
-type AppRole = Database['public']['Enums']['app_role'];
-
-interface AccessCode {
-  id: string;
-  role: AppRole;
-  code: string;
-}
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Save, KeyRound } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AccessCodeManagement() {
-  const { toast } = useToast();
-  const [codes, setCodes] = useState<AccessCode[]>([]);
+  const [keys, setKeys] = useState({ admin: '', team: '', receptionist: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showCodes, setShowCodes] = useState<Record<string, boolean>>({});
-  const [editedCodes, setEditedCodes] = useState<Record<string, string>>({});
+  const { toast } = useToast();
 
-  const fetchCodes = async () => {
-    const { data, error } = await supabase
-      .from('access_codes')
-      .select('*')
-      .order('role');
-
+  // Busca as chaves atuais do banco
+  const fetchKeys = async () => {
+    const { data, error } = await supabase.from('access_keys').select('*');
+    
     if (error) {
-      toast({ title: 'Erro', description: 'Falha ao carregar códigos.', variant: 'destructive' });
-    } else {
-      setCodes(data || []);
-      const initialEdited: Record<string, string> = {};
-      data?.forEach(code => {
-        initialEdited[code.role as string] = code.code;
+      toast({ title: "Erro", description: "Falha ao carregar chaves.", variant: "destructive" });
+    } else if (data) {
+      const newKeys = { admin: '', team: '', receptionist: '' };
+      data.forEach((k: any) => {
+        if (k.key_type === 'admin') newKeys.admin = k.key_value;
+        if (k.key_type === 'team') newKeys.team = k.key_value;
+        if (k.key_type === 'receptionist') newKeys.receptionist = k.key_value;
       });
-      setEditedCodes(initialEdited);
+      // Se vier vazio do banco, mantém os padrões para visualização
+      if (!newKeys.admin) newKeys.admin = 'MASTER_FLORIPA';
+      if (!newKeys.team) newKeys.team = 'EQUIPE_2025';
+      if (!newKeys.receptionist) newKeys.receptionist = 'RECEPCAO_EVENTO';
+      
+      setKeys(newKeys);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchCodes();
+    fetchKeys();
   }, []);
 
   const handleSave = async () => {
     setSaving(true);
+    
+    const updates = [
+      { key_type: 'admin', key_value: keys.admin },
+      { key_type: 'team', key_value: keys.team },
+      { key_type: 'receptionist', key_value: keys.receptionist }
+    ];
 
-    for (const code of codes) {
-      const roleKey = code.role as string;
-      const newCode = editedCodes[roleKey];
-      if (newCode && newCode !== code.code) {
-        const { error } = await supabase
-          .from('access_codes')
-          .update({ code: newCode, updated_at: new Date().toISOString() })
-          .eq('role', code.role);
+    const { error } = await supabase.from('access_keys').upsert(updates);
 
-        if (error) {
-          toast({ title: 'Erro', description: `Falha ao atualizar código de ${code.role}.`, variant: 'destructive' });
-          setSaving(false);
-          return;
-        }
-      }
+    if (error) {
+      toast({ title: "Erro", description: "Falha ao salvar.", variant: "destructive" });
+    } else {
+      toast({ title: "Sucesso", description: "Novos códigos de acesso salvos!" });
     }
-
-    toast({ title: 'Sucesso', description: 'Códigos de acesso atualizados!' });
-    fetchCodes();
     setSaving(false);
   };
 
-  const toggleShowCode = (role: string) => {
-    setShowCodes(prev => ({ ...prev, [role]: !prev[role] }));
-  };
-
-  const getRoleLabel = (role: string) => {
-    const labels: Record<string, string> = {
-      admin: 'Administrador',
-      equipe: 'Equipe',
-      recepcao: 'Recepção'
-    };
-    return labels[role] || role;
-  };
-
-  const getRoleDescription = (role: string) => {
-    const descriptions: Record<string, string> = {
-      admin: 'Acesso total: gerencia eventos, usuários e configurações',
-      equipe: 'Cria eventos e gerencia convidados',
-      recepcao: 'Apenas check-in e impressão de etiquetas'
-    };
-    return descriptions[role] || '';
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Shield className="h-5 w-5 text-primary" />
-        <h3 className="text-lg font-semibold text-foreground">Configurar Chaves de Acesso</h3>
+      <div className="flex items-center gap-2 mb-2">
+        <KeyRound className="h-5 w-5 text-primary" />
+        <h3 className="text-lg font-semibold text-foreground">Gerenciar Códigos de Cadastro</h3>
       </div>
-
-      <p className="text-sm text-muted-foreground">
-        Estes códigos são usados durante o cadastro para determinar o nível de acesso do novo usuário.
-      </p>
-
-      <div className="space-y-4">
-        {codes.map((code) => (
-          <div key={code.id} className="bg-surface border border-border rounded-lg p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <Label className="text-foreground font-medium flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-primary" />
-                  Código {getRoleLabel(code.role)}
-                </Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {getRoleDescription(code.role)}
-                </p>
-              </div>
-            </div>
-            <div className="relative mt-3">
-              <Input
-                type={showCodes[code.role] ? 'text' : 'password'}
-                value={editedCodes[code.role] || ''}
-                onChange={(e) => setEditedCodes(prev => ({ ...prev, [code.role]: e.target.value }))}
-                className="bg-secondary border-border pr-10 font-mono"
-                placeholder="Digite o novo código"
-              />
-              <button
-                type="button"
-                onClick={() => toggleShowCode(code.role)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showCodes[code.role] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
+      
+      <div className="grid gap-6">
+        <div className="space-y-2">
+          <Label className="text-foreground">Código Admin (Acesso Total)</Label>
+          <div className="flex gap-2">
+            <Input 
+              value={keys.admin} 
+              onChange={e => setKeys({...keys, admin: e.target.value})} 
+              className="bg-secondary border-border font-mono text-primary" 
+            />
           </div>
-        ))}
+          <p className="text-xs text-muted-foreground">Use este código para criar novos administradores.</p>
+        </div>
+        
+        <div className="space-y-2">
+          <Label className="text-foreground">Código da Equipe</Label>
+          <Input 
+            value={keys.team} 
+            onChange={e => setKeys({...keys, team: e.target.value})} 
+            className="bg-secondary border-border font-mono" 
+          />
+          <p className="text-xs text-muted-foreground">Permite criar eventos e editar listas.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-foreground">Código da Recepção</Label>
+          <Input 
+            value={keys.receptionist} 
+            onChange={e => setKeys({...keys, receptionist: e.target.value})} 
+            className="bg-secondary border-border font-mono" 
+          />
+          <p className="text-xs text-muted-foreground">Apenas check-in e visualização (sem excluir).</p>
+        </div>
       </div>
 
-      <Button 
-        onClick={handleSave} 
-        className="w-full bg-primary hover:bg-primary/90"
-        disabled={saving}
-      >
-        {saving ? (
-          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-        ) : (
-          <Save className="h-4 w-4 mr-2" />
-        )}
-        Salvar Alterações
-      </Button>
+      <div className="pt-4">
+        <Button onClick={handleSave} disabled={saving} className="w-full bg-primary hover:bg-primary/90">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+          Salvar Novos Códigos
+        </Button>
+      </div>
     </div>
   );
 }
