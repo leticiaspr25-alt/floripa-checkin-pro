@@ -46,14 +46,12 @@ interface ActivityLog {
   details: string | null;
 }
 
-// --- FUNÇÃO DE NOME INTELIGENTE (ENCURTA MAS MANTÉM 1 LINHA) ---
+// --- FUNÇÃO DE NOME INTELIGENTE ---
 const formatNameForBadge = (fullName: string) => {
   if (!fullName) return "";
-  
   const prepositions = ["da", "de", "do", "das", "dos", "e"];
   const parts = fullName.trim().split(/\s+/);
   
-  // Se for curto, mostra tudo formatado
   if (parts.length <= 3) {
     return parts.map((word, index) => {
       const lower = word.toLowerCase();
@@ -62,28 +60,21 @@ const formatNameForBadge = (fullName: string) => {
     }).join(' ');
   }
 
-  // Lógica: 1º Nome + até 2 Sobrenomes (ignorando 'da' na contagem)
   let formattedName = [];
   let surnamesCount = 0;
 
   for (let i = 0; i < parts.length; i++) {
     let word = parts[i].toLowerCase();
-    
-    // Capitaliza (Title Case)
     let displayWord = word;
     if (!prepositions.includes(word) || i === 0) {
       displayWord = word.charAt(0).toUpperCase() + word.slice(1);
     } else {
       displayWord = word;
     }
-
     formattedName.push(displayWord);
-
-    // Só conta como "sobrenome gasto" se não for preposição
     if (i > 0 && !prepositions.includes(word)) {
       surnamesCount++;
     }
-
     if (surnamesCount >= 2) break;
   }
   
@@ -99,7 +90,6 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -251,45 +241,101 @@ export default function EventManagement() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* CSS IMPRESSÃO: NOME EM 1 LINHA, TAMANHO 14PT */}
+      
+      {/* CSS IMPRESSÃO BLINDADO: 
+          - Force Background White (Corrige a foto preta)
+          - Max-Height: 35mm (Corrige o pular linhas)
+          - Fonte 14pt (Padrão pedido)
+      */}
       <style>{`
         @media print {
           @page { size: 90mm 35mm; margin: 0; }
-          body * { visibility: hidden; }
-          .print-label, .print-label * { 
-            visibility: visible !important; 
-            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          
+          body, html, #root, .min-h-screen {
+            background-color: white !important;
+            color: black !important;
+            overflow: visible !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
+          
+          /* Esconde tudo que não é etiqueta */
+          body > *:not(.print-container) {
+            display: none !important;
+          }
+          
+          .print-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+          }
+
           .print-label { 
-            position: fixed; top: 0; left: 0; width: 90mm; height: 35mm; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-            background: white !important; color: black !important; text-align: center; 
-            padding: 0 3mm; box-sizing: border-box; overflow: hidden;
+            position: relative;
+            width: 90mm; 
+            height: 35mm; /* TRAVA DE ALTURA */
+            max-height: 35mm;
+            
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            text-align: center; 
+            
+            background: white !important; 
+            color: black !important; 
+            
+            padding: 0 2mm; 
+            box-sizing: border-box; 
+            overflow: hidden; /* CORTA SE PASSAR */
+            page-break-after: always;
           }
-          .label-page-break { page-break-after: always; }
+          
+          /* Remove quebra da última para economizar papel */
+          .print-label:last-child { page-break-after: auto; }
           
           .guest-name { 
             font-family: 'Inter', sans-serif; font-weight: 800; 
-            font-size: 14pt !important; 
-            line-height: 1.1; width: 100%; 
-            white-space: nowrap !important; /* FORÇA 1 LINHA */
-            overflow: hidden; text-overflow: ellipsis; 
-            margin-bottom: 1.5mm; 
+            font-size: 14pt !important; /* Tamanho 14pt */
+            line-height: 1.1; 
+            width: 100%; 
+            
+            /* Limita a 1 linha se quiser, ou 2 no máximo */
+            white-space: normal; 
+            max-height: 28mm; /* Segurança */
+            word-wrap: break-word; 
+            
+            margin-bottom: 1mm; 
             color: black !important;
-            /* Sem Uppercase */
           }
           
           .guest-company { 
             font-family: 'Inter', sans-serif; font-weight: 500; 
-            font-size: 10pt !important; width: 100%; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+            font-size: 9pt !important; 
+            width: 100%; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
             color: black !important;
-            /* Se estiver vazio, o div colapsa e o nome fica centralizado */
           }
         }
       `}</style>
 
-      {printingGuest && <><div className="print-label label-page-break"><div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div><div className="print-label"><div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>{printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}</div></>}
+      {/* CONTAINER DE IMPRESSÃO DUPLA */}
+      {printingGuest && (
+        <div className="print-container">
+          <div className="print-label">
+            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
+            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
+          </div>
+          <div className="print-label">
+            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
+            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
+          </div>
+        </div>
+      )}
 
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
