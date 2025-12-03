@@ -12,8 +12,10 @@ import { Plus, Calendar, LogOut, Loader2, Users, KeyRound, Shield } from 'lucide
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+// ESTAS LINHAS VOLTARAM (IMPORTANTE)
+import UserManagement from '@/components/admin/UserManagement';
+import AccessCodeManagement from '@/components/admin/AccessCodeManagement';
 
-// --- Interfaces ---
 interface Event {
   id: string;
   name: string;
@@ -45,7 +47,7 @@ export default function Dashboard() {
   }, [user]);
 
   const fetchEvents = async () => {
-    // CORREÇÃO: Removemos o filtro de user_id para mostrar todos os eventos
+    // CORREÇÃO: Removemos o filtro .eq('user_id', user.id) para mostrar TODOS os eventos
     const { data, error } = await supabase
       .from('events')
       .select('*')
@@ -164,19 +166,16 @@ export default function Dashboard() {
               />
             </TabsContent>
 
+            {/* AQUI ESTÃO OS COMPONENTES QUE EU TINHA REMOVIDO */}
             <TabsContent value="users">
-              <div className="bg-card border border-border rounded-xl p-6 text-center">
-                <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-medium text-foreground">Gestão de Usuários</h3>
-                <p className="text-muted-foreground mb-4">Em breve: Lista de usuários e reset de senha.</p>
+              <div className="bg-card border border-border rounded-xl p-6">
+                <UserManagement />
               </div>
             </TabsContent>
 
             <TabsContent value="access">
-              <div className="bg-card border border-border rounded-xl p-6 text-center">
-                <KeyRound className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-medium text-foreground">Chaves de Acesso</h3>
-                <p className="text-muted-foreground mb-4">Em breve: Edição dos códigos mestres.</p>
+              <div className="bg-card border border-border rounded-xl p-6">
+                <AccessCodeManagement />
               </div>
             </TabsContent>
           </Tabs>
@@ -200,7 +199,7 @@ export default function Dashboard() {
   );
 }
 
-// --- Componente Auxiliar de Lista ---
+// --- SUB-COMPONENTE DA LISTA DE EVENTOS ---
 interface EventsSectionProps {
   events: Event[];
   createDialogOpen: boolean;
