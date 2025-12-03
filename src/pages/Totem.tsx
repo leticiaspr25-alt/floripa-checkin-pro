@@ -1,75 +1,65 @@
-import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import QRCode from 'react-qr-code';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Monitor } from "lucide-react";
 
-interface Event {
-  id: string;
+interface EventData {
   name: string;
+  photo_img_url: string | null;
+  layout_mode: 'standard' | 'full_screen' | null;
 }
 
 export default function Totem() {
   const { id } = useParams<{ id: string }>();
-  const [event, setEvent] = useState<Event | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [event, setEvent] = useState<EventData | null>(null);
 
   useEffect(() => {
+    async function fetchEvent() {
+      if (!id) return;
+      const { data } = await supabase.from("events").select("*").eq("id", id).single();
+      if (data) setEvent(data as unknown as EventData);
+    }
     fetchEvent();
   }, [id]);
 
-  const fetchEvent = async () => {
-    const { data } = await supabase
-      .from('events')
-      .select('id, name')
-      .eq('id', id)
-      .single();
+  if (!event) return <div className="h-screen bg-black flex items-center justify-center text-white">Carregando...</div>;
 
-    setEvent(data);
-    setLoading(false);
-  };
-
-  if (loading) {
+  // MODO ARTE TOTAL (FULL SCREEN)
+  if (event.layout_mode === 'full_screen') {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="h-screen w-screen bg-black overflow-hidden flex items-center justify-center">
+        {event.photo_img_url ? (
+          <img src={event.photo_img_url} alt="Totem Vertical" className="w-full h-full object-contain" />
+        ) : (
+          <div className="text-white">Aguardando arte vertical...</div>
+        )}
       </div>
     );
   }
 
-  if (!event) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground text-xl">Evento não encontrado</p>
-      </div>
-    );
-  }
-
-  const checkinUrl = `${window.location.origin}/guest/${id}`;
-
+  // MODO PADRÃO (CHECK-IN)
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
-      <div className="text-center mb-12 animate-fade-in">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-primary" />
-        </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">{event.name}</h1>
-        <p className="text-xl text-muted-foreground">Escaneie o QR Code para fazer check-in</p>
+    <div className="h-screen bg-black flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+      <div className="mb-8 p-4 bg-[#f37021]/10 rounded-full animate-bounce">
+        <Monitor size={40} className="text-[#f37021]" />
       </div>
-
-      <div className="bg-foreground p-8 rounded-3xl shadow-2xl animate-scale-in">
-        <QRCode
-          value={checkinUrl}
-          size={300}
-          level="H"
-          bgColor="#fafafa"
-          fgColor="#000000"
+      
+      <div className="bg-white p-6 rounded-3xl shadow-[0_0_120px_rgba(243,112,33,0.3)] mb-12 transform hover:scale-105 transition-transform duration-500">
+        {/* Usando API de QR Code para evitar erro de biblioteca */}
+        <img 
+           src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + '/guest/' + id)}`} 
+           className="w-[250px] h-[250px]"
+           alt="QR Check-in"
         />
       </div>
-
-      <p className="mt-8 text-muted-foreground text-center max-w-md">
-        Aponte a câmera do seu celular para o código acima
-      </p>
+      
+      <h1 className="text-7xl font-black text-white mb-6 tracking-tighter">CHECK-IN</h1>
+      <div className="w-24 h-1.5 bg-[#f37021] rounded-full mb-8"></div>
+      <p className="text-3xl text-gray-400 font-light">{event.name}</p>
+      
+      <div className="mt-16 flex items-center gap-3 text-gray-600">
+        <span className="text-sm uppercase tracking-widest font-bold">Aponte a câmera do seu celular</span>
+      </div>
     </div>
   );
 }
