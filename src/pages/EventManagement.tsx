@@ -12,22 +12,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, Search, Upload, Plus, Download, Settings, 
-  Printer, Users, UserCheck, Loader2, ExternalLink, Trash2, 
-  Monitor, Wifi, History, Clock, Image as ImageIcon, Smartphone, 
-  QrCode, Pencil // <--- O LÁPIS ESTÁ AQUI
+  Printer, Users, UserCheck, Loader2, ExternalLink, Trash2, Pencil,
+  Monitor, Wifi, History, Clock, Image as ImageIcon, Smartphone, QrCode
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-// --- INTERFACES DE DADOS ---
+// --- INTERFACES ---
 interface Event {
   id: string;
   name: string;
   date: string;
   wifi_ssid: string | null;
   wifi_pass: string | null;
-  wifi_img_url: string | null; // Arte da TV (Horizontal)
-  photo_url: string | null;    // Link do Moments
-  photo_img_url: string | null; // Arte do Celular (Vertical)
+  wifi_img_url: string | null; // Arte TV
+  photo_url: string | null;
+  photo_img_url: string | null; // Arte Celular
 }
 
 interface Guest {
@@ -47,7 +46,7 @@ interface ActivityLog {
   details: string | null;
 }
 
-// --- COMPONENTE VISUAL: CAIXA DE UPLOAD (UPLOAD REAL) ---
+// --- COMPONENTE VISUAL: CAIXA DE UPLOAD ---
 function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?: 'qr-code' | 'image', previewUrl?: string | null, onUpload: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -67,7 +66,7 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
 
       const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
       onUpload(data.publicUrl);
-      toast({ title: "Sucesso", description: "Imagem carregada na nuvem." });
+      toast({ title: "Sucesso", description: "Imagem carregada." });
 
     } catch (error: any) {
       console.error('Erro upload:', error);
@@ -85,17 +84,13 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
       onClick={() => !uploading && inputRef.current?.click()}
     >
       <input type="file" hidden ref={inputRef} onChange={handleFileChange} accept="image/*" disabled={uploading} />
-      
       {uploading ? (
-        <div className="flex flex-col items-center gap-2 text-primary">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="text-xs text-muted-foreground">Enviando...</span>
-        </div>
+        <div className="flex flex-col items-center gap-2"><Loader2 className="h-8 w-8 animate-spin text-primary" /><span className="text-xs text-muted-foreground">Enviando...</span></div>
       ) : previewUrl ? (
         <div className="absolute inset-0 w-full h-full">
           <img src={previewUrl} className="w-full h-full object-contain p-4" alt="Preview" />
           <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm">
-            <span className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-bold shadow-xl transform translate-y-2 group-hover:translate-y-0 transition-transform">Trocar</span>
+            <span className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-bold shadow-xl transform translate-y-2 group-hover:translate-y-0 transition-transform">Trocar Imagem</span>
           </div>
         </div>
       ) : (
@@ -103,10 +98,7 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
           <div className="p-4 bg-secondary rounded-full group-hover:bg-primary/20 transition-colors">
             {icon === 'image' ? <ImageIcon size={28} /> : <Upload size={28} />}
           </div>
-          <div className="text-center">
-            <span className="block text-sm font-bold uppercase tracking-widest">{label}</span>
-            <span className="text-xs opacity-60">Clique para selecionar</span>
-          </div>
+          <div className="text-center"><span className="block text-sm font-bold uppercase tracking-widest">{label}</span><span className="text-xs opacity-60">Clique para selecionar</span></div>
         </div>
       )}
     </div>
@@ -120,46 +112,41 @@ export default function EventManagement() {
   const { user, loading: authLoading, isAdmin, isEquipe } = useAuth();
   const { toast } = useToast();
   
-  // Estados de Dados
   const [event, setEvent] = useState<Event | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  
-  // Estados de UI
   const [loading, setLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Modais (Adicionar e Editar)
   const [addGuestOpen, setAddGuestOpen] = useState(false);
   const [newGuest, setNewGuest] = useState({ name: '', company: '', role: '' });
   const [adding, setAdding] = useState(false);
   const [printingGuest, setPrintingGuest] = useState<Guest | null>(null);
 
-  // ESTADOS DE EDIÇÃO (O QUE VOCÊ PEDIU)
+  // ESTADOS DE EDIÇÃO
   const [editGuestOpen, setEditGuestOpen] = useState(false);
   const [guestToEdit, setGuestToEdit] = useState<Guest | null>(null);
   const [editFormData, setEditFormData] = useState({ name: '', company: '', role: '' });
 
-  // Configurações
+  // CONFIGURAÇÕES DO EVENTO
   const [eventSettings, setEventSettings] = useState({
     name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: ''
   });
 
-  // Permissões
+  // PERMISSÕES
   const canImportExport = isAdmin || isEquipe;
   const canDeleteGuests = isAdmin;
+  const canEditGuests = isAdmin || isEquipe; // Apenas Adm e Equipe podem editar
   const canAccessSettings = isAdmin || isEquipe;
   const canAccessHistory = isAdmin || isEquipe;
 
-  // --- LOGS ---
   const logActivity = async (action: string, details: string) => {
     if (!user || !id) return;
     await supabase.from('activity_logs').insert({ event_id: id, user_id: user.id, user_email: user.email, action, details });
   };
 
-  // --- INICIALIZAÇÃO ---
   useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
   useEffect(() => { if (id && user) { fetchEvent(); fetchGuests(); subscribeToGuests(); } }, [id, user]);
 
@@ -172,7 +159,7 @@ export default function EventManagement() {
         name: data.name, date: new Date(data.date).toISOString().slice(0, 16),
         wifi_ssid: data.wifi_ssid || '', wifi_pass: data.wifi_pass || '',
         photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', // Arte TV
-        photo_img_url: data.photo_img_url || '' // Arte Celular
+        photo_img_url: data.photo_img_url || '', // Arte Celular
       });
     }
     setLoading(false);
@@ -182,7 +169,6 @@ export default function EventManagement() {
   const fetchActivityLogs = async () => { if (!canAccessHistory) return; setLogsLoading(true); const { data, error } = await supabase.from('activity_logs').select('*').eq('event_id', id).order('created_at', { ascending: false }).limit(100); if (!error) setActivityLogs(data || []); setLogsLoading(false); };
   const subscribeToGuests = () => { const channel = supabase.channel('guests-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'guests', filter: `event_id=eq.${id}` }, () => fetchGuests()).subscribe(); return () => { supabase.removeChannel(channel); }; };
 
-  // --- AÇÕES DE CONVIDADOS ---
   const handleToggleCheckIn = async (guest: Guest) => {
     const newCheckedIn = !guest.checked_in;
     const { error } = await supabase.from('guests').update({ checked_in: newCheckedIn, checkin_time: newCheckedIn ? new Date().toISOString() : null }).eq('id', guest.id);
@@ -193,51 +179,38 @@ export default function EventManagement() {
     e.preventDefault(); setAdding(true);
     const { error } = await supabase.from('guests').insert({ event_id: id, name: newGuest.name, company: newGuest.company || null, role: newGuest.role || null });
     if (error) toast({ title: 'Erro', description: 'Falha ao adicionar.', variant: 'destructive' }); 
-    else { toast({ title: 'Sucesso', description: 'Adicionado!' }); await logActivity('Adicionou', `${newGuest.name}`); await fetchGuests(); setAddGuestOpen(false); setNewGuest({ name: '', company: '', role: '' }); }
+    else { toast({ title: 'Sucesso', description: 'Convidado adicionado!' }); await logActivity('Adicionou convidado', `${newGuest.name}`); await fetchGuests(); setAddGuestOpen(false); setNewGuest({ name: '', company: '', role: '' }); }
     setAdding(false);
   };
 
-  // FUNÇÃO DE SALVAR EDIÇÃO
+  // SALVAR EDIÇÃO
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!guestToEdit) return; setAdding(true);
     const { error } = await supabase.from('guests').update({ name: editFormData.name, company: editFormData.company || null, role: editFormData.role || null }).eq('id', guestToEdit.id);
-    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Atualizado!' }); await logActivity('Editou', `${editFormData.name}`); await fetchGuests(); setEditGuestOpen(false); setGuestToEdit(null); }
+    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Convidado atualizado!' }); await logActivity('Editou convidado', `${editFormData.name}`); await fetchGuests(); setEditGuestOpen(false); setGuestToEdit(null); }
     setAdding(false);
   };
 
-  const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu', `${guest.name}`); await fetchGuests(); } };
+  const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu convidado', `${guest.name}`); await fetchGuests(); } };
   const handlePrint = (guest: Guest) => { setPrintingGuest(guest); setTimeout(() => { window.print(); setPrintingGuest(null); }, 100); };
 
-  // --- IMPORTAÇÃO INTELIGENTE (Reconhece sua planilha "Participantes.xlsx") ---
+  // IMPORTAÇÃO INTELIGENTE (Lê sua planilha)
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canImportExport) return;
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
+    if (!canImportExport) return; const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const data = evt.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json<any>(sheet);
-
+        const data = evt.target?.result; const workbook = XLSX.read(data, { type: 'binary' }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; const jsonData = XLSX.utils.sheet_to_json<any>(sheet);
         const guestsToInsert = jsonData.map((row: any) => {
           const keys = Object.keys(row);
-          // Procura colunas "Name", "Nome", "Participante", etc
-          const nameKey = keys.find(k => k.toLowerCase().match(/(name|nome|participante|convidado)/));
-          const companyKey = keys.find(k => k.toLowerCase().match(/(company|empresa|organizacao)/));
-          const roleKey = keys.find(k => k.toLowerCase().match(/(role|cargo|funcao)/));
-
-          if (!nameKey) return null;
-          return { event_id: id, name: row[nameKey], company: companyKey ? row[companyKey] : null, role: roleKey ? row[roleKey] : null };
+          const nameKey = keys.find(k => k.toLowerCase().match(/(nome|name|participante|convidado|fullname)/));
+          const companyKey = keys.find(k => k.toLowerCase().match(/(empresa|company|organizacao|instituicao|org)/));
+          const roleKey = keys.find(k => k.toLowerCase().match(/(cargo|role|funcao|ocupacao)/));
+          if (!nameKey) return null; return { event_id: id, name: row[nameKey], company: companyKey ? row[companyKey] : null, role: roleKey ? row[roleKey] : null };
         }).filter((g: any) => g && g.name);
-
-        if (guestsToInsert.length === 0) { toast({ title: 'Erro', description: 'Colunas não identificadas.', variant: 'destructive' }); return; }
-        
+        if (guestsToInsert.length === 0) { toast({ title: 'Erro', description: 'Colunas inválidas. Verifique se tem "Name" ou "Nome".', variant: 'destructive' }); return; }
         const { error } = await supabase.from('guests').insert(guestsToInsert);
-        if (error) toast({ title: 'Erro', description: 'Falha ao importar.', variant: 'destructive' });
-        else { toast({ title: 'Sucesso', description: `${guestsToInsert.length} importados!` }); await logActivity('Importou', 'Excel'); await fetchGuests(); }
+        if (error) toast({ title: 'Erro', description: 'Falha no banco.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: `${guestsToInsert.length} importados!` }); await logActivity('Importou', 'Excel'); await fetchGuests(); }
       } catch (err) { toast({ title: 'Erro', description: 'Arquivo inválido.', variant: 'destructive' }); }
     };
     reader.readAsBinaryString(file); e.target.value = '';
@@ -250,7 +223,9 @@ export default function EventManagement() {
     const { error } = await supabase.from('events').update({
       name: eventSettings.name, date: new Date(eventSettings.date).toISOString(),
       wifi_ssid: eventSettings.wifi_ssid || null, wifi_pass: eventSettings.wifi_pass || null,
-      photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null, photo_img_url: eventSettings.photo_img_url || null
+      photo_url: eventSettings.photo_url || null, 
+      wifi_img_url: eventSettings.wifi_img_url || null, // Arte TV
+      photo_img_url: eventSettings.photo_img_url || null, // Arte Celular
     }).eq('id', id);
     if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Salvo!' }); await logActivity('Atualizou configurações', 'Alterações salvas'); fetchEvent(); }
     setSaving(false);
@@ -263,7 +238,6 @@ export default function EventManagement() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* CSS Impressão Ajustado */}
       <style>{`
         @media print {
           @page { size: 90mm 35mm; margin: 0; }
@@ -297,7 +271,6 @@ export default function EventManagement() {
             {canAccessSettings && <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Configurações</TabsTrigger>}
           </TabsList>
 
-          {/* ABA CONVIDADOS */}
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold text-primary">{guests.length}</p></div>
@@ -309,15 +282,16 @@ export default function EventManagement() {
               <Dialog open={addGuestOpen} onOpenChange={setAddGuestOpen}><DialogTrigger asChild><Button variant="outline" className="border-border"><Plus className="h-4 w-4 mr-2" />Manual</Button></DialogTrigger><DialogContent className="bg-card border-border"><DialogHeader><DialogTitle>Adicionar Convidado</DialogTitle></DialogHeader><form onSubmit={handleAddGuest} className="space-y-4 mt-4"><Input placeholder="Nome" value={newGuest.name} onChange={e=>setNewGuest({...newGuest, name: e.target.value})} required className="bg-secondary border-border" /><Input placeholder="Empresa" value={newGuest.company} onChange={e=>setNewGuest({...newGuest, company: e.target.value})} className="bg-secondary border-border" /><Input placeholder="Cargo" value={newGuest.role} onChange={e=>setNewGuest({...newGuest, role: e.target.value})} className="bg-secondary border-border" /><Button type="submit" className="w-full bg-primary" disabled={adding}>Adicionar</Button></form></DialogContent></Dialog>
             </div>
             <div className="space-y-3">
-              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">
-                {/* BOTÃO LÁPIS (EDIÇÃO) */}
-                <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }} className="hover:text-primary"><Pencil className="h-4 w-4"/></Button>
+              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div>
+              <div className="flex items-center gap-3 shrink-0">
+                {/* BOTÃO DE EDITAR (LÁPIS) - SÓ PARA ADM/EQUIPE */}
+                {canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }} className="hover:text-primary"><Pencil className="h-4 w-4"/></Button>}
                 <Button variant="ghost" size="icon" onClick={()=>handlePrint(g)}><Printer className="h-4 w-4"/></Button>
-                {canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
+                {canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/>
+              </div></div>))}
             </div>
           </TabsContent>
 
-          {/* ABA HISTÓRICO */}
           {canAccessHistory && (
             <TabsContent value="history" className="space-y-6 animate-fade-in">
               <div className="flex items-center gap-2 mb-4"><History className="h-5 w-5 text-primary" /><h3 className="text-lg font-semibold text-foreground">Histórico</h3></div>
@@ -325,7 +299,6 @@ export default function EventManagement() {
             </TabsContent>
           )}
 
-          {/* ABA CONFIGURAÇÕES (3 CARDS) */}
           {canAccessSettings && (
             <TabsContent value="settings" className="space-y-6 animate-fade-in">
               <form onSubmit={handleSaveSettings} className="space-y-8">
@@ -333,13 +306,36 @@ export default function EventManagement() {
                   <div className="space-y-2"><Label>Nome do Evento</Label><Input value={eventSettings.name} onChange={e=>setEventSettings({...eventSettings, name: e.target.value})} className="bg-card border-border" /></div>
                   <div className="space-y-2"><Label>Data</Label><Input type="datetime-local" value={eventSettings.date} onChange={e=>setEventSettings({...eventSettings, date: e.target.value})} className="bg-card border-border" /></div>
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* TOTEM */}
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1"><div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Monitor className="text-primary" /><h3 className="font-bold">Totem (Térreo)</h3></div><div className="text-sm text-muted-foreground p-4 bg-secondary/30 rounded-lg border border-border text-center"><QrCode className="mx-auto mb-2 opacity-50" size={32} />Exibe QR Code automático para check-in.</div></div>
+                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1">
+                    <div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Monitor className="text-primary" /><h3 className="font-bold">Totem (Térreo)</h3></div>
+                    <div className="text-sm text-muted-foreground p-4 bg-secondary/30 rounded-lg border border-border text-center"><QrCode className="mx-auto mb-2 opacity-50" size={32} />Gera QR Code automático para check-in. (Sem upload)</div>
+                  </div>
+
                   {/* TV */}
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1"><div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Wifi className="text-primary" /><h3 className="font-bold">TV (12º Andar)</h3></div><div className="space-y-4"><Label>Arte Horizontal (1920x1080)</Label><UploadBox label="Arraste a Arte da TV" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} /><p className="text-xs text-muted-foreground">Esta imagem aparecerá na TV.</p></div></div>
+                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1">
+                    <div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Wifi className="text-primary" /><h3 className="font-bold">TV (12º Andar)</h3></div>
+                    <div className="space-y-4">
+                      <Label>Arte Horizontal (1920x1080)</Label>
+                      <UploadBox label="Arraste a Arte da TV" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
+                      <p className="text-xs text-muted-foreground">Esta imagem aparecerá na TV.</p>
+                    </div>
+                  </div>
+
                   {/* CELULAR */}
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1"><div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Smartphone className="text-primary" /><h3 className="font-bold">Celular</h3></div><div className="space-y-4"><Label>Arte Vertical (Mobile)</Label><UploadBox label="Arraste a Arte do Celular" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /><div className="space-y-1"><Label>SSID Wi-Fi</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div><div className="space-y-1"><Label>Senha Wi-Fi</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div><div className="space-y-1"><Label>Link Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border"/></div><p className="text-xs text-muted-foreground mt-2">Estes dados geram os QR Codes mobile.</p></div></div>
+                  <div className="bg-card border border-border rounded-xl p-6 shadow-lg col-span-1">
+                    <div className="flex items-center gap-2 border-b border-border pb-4 mb-4"><Smartphone className="text-primary" /><h3 className="font-bold">Celular / Dados</h3></div>
+                    <div className="space-y-4">
+                      <Label>Arte Vertical (Mobile)</Label>
+                      <UploadBox label="Arraste a Arte do Celular" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} />
+                      <div className="space-y-1"><Label>SSID Wi-Fi</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div>
+                      <div className="space-y-1"><Label>Senha Wi-Fi</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div>
+                      <div className="space-y-1"><Label>Link Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border"/></div>
+                      <p className="text-xs text-muted-foreground mt-2">Estes dados geram os QR Codes mobile.</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="pt-6 border-t border-border flex justify-end"><Button type="submit" className="bg-primary hover:bg-primary/90 px-8 py-6 h-auto text-lg" disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : 'Salvar Tudo'}</Button></div>
               </form>
@@ -347,7 +343,6 @@ export default function EventManagement() {
           )}
         </Tabs>
 
-        {/* MODAL DE EDIÇÃO */}
         <Dialog open={editGuestOpen} onOpenChange={setEditGuestOpen}>
           <DialogContent className="bg-card border-border">
             <DialogHeader><DialogTitle>Editar Convidado</DialogTitle></DialogHeader>
