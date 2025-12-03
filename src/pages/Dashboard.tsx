@@ -49,7 +49,6 @@ export default function Dashboard() {
     const { data, error } = await supabase
       .from('events')
       .select('*')
-      .eq('user_id', user?.id)
       .order('date', { ascending: false });
 
     if (error) {
