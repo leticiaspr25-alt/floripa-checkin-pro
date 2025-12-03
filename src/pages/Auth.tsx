@@ -164,7 +164,7 @@ export default function Auth() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Email Corporativo</Label>
+                  <Label>Email</Label>
                   <Input 
                     type="email" 
                     value={newEmail} 
@@ -199,11 +199,11 @@ export default function Auth() {
                 
                 {/* Código de Acesso (SEM PLACEHOLDER REVELADOR) */}
                 <div className="space-y-2 pt-2 border-t border-[#333] mt-2">
-                  <Label className="text-[#f37021] font-bold">Código de Acesso Corporativo</Label>
+                  <Label className="text-[#f37021] font-bold">Código de Acesso</Label>
                   <Input 
                     value={accessCode} 
                     onChange={e=>setAccessCode(e.target.value)} 
-                    placeholder="Digite o código fornecido pelo Administrador"
+                    placeholder="Digite o Código Fornecido pelo Administrador"
                     required 
                     className="bg-black border-[#f37021]/50 text-white focus:border-[#f37021]" 
                   />
