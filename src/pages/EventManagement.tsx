@@ -138,7 +138,7 @@ export default function EventManagement() {
   // PERMISSÕES
   const canImportExport = isAdmin || isEquipe;
   const canDeleteGuests = isAdmin;
-  const canEditGuests = isAdmin || isEquipe; // Apenas Adm e Equipe podem editar
+  const canEditGuests = isAdmin || isEquipe;
   const canAccessSettings = isAdmin || isEquipe;
   const canAccessHistory = isAdmin || isEquipe;
 
@@ -158,8 +158,8 @@ export default function EventManagement() {
       setEventSettings({
         name: data.name, date: new Date(data.date).toISOString().slice(0, 16),
         wifi_ssid: data.wifi_ssid || '', wifi_pass: data.wifi_pass || '',
-        photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', // Arte TV
-        photo_img_url: data.photo_img_url || '', // Arte Celular
+        photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', 
+        photo_img_url: data.photo_img_url || ''
       });
     }
     setLoading(false);
@@ -183,7 +183,6 @@ export default function EventManagement() {
     setAdding(false);
   };
 
-  // SALVAR EDIÇÃO
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!guestToEdit) return; setAdding(true);
     const { error } = await supabase.from('guests').update({ name: editFormData.name, company: editFormData.company || null, role: editFormData.role || null }).eq('id', guestToEdit.id);
@@ -194,7 +193,7 @@ export default function EventManagement() {
   const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu convidado', `${guest.name}`); await fetchGuests(); } };
   const handlePrint = (guest: Guest) => { setPrintingGuest(guest); setTimeout(() => { window.print(); setPrintingGuest(null); }, 100); };
 
-  // IMPORTAÇÃO INTELIGENTE (Lê sua planilha)
+  // IMPORTAÇÃO INTELIGENTE
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canImportExport) return; const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
@@ -208,7 +207,7 @@ export default function EventManagement() {
           const roleKey = keys.find(k => k.toLowerCase().match(/(cargo|role|funcao|ocupacao)/));
           if (!nameKey) return null; return { event_id: id, name: row[nameKey], company: companyKey ? row[companyKey] : null, role: roleKey ? row[roleKey] : null };
         }).filter((g: any) => g && g.name);
-        if (guestsToInsert.length === 0) { toast({ title: 'Erro', description: 'Colunas inválidas. Verifique se tem "Name" ou "Nome".', variant: 'destructive' }); return; }
+        if (guestsToInsert.length === 0) { toast({ title: 'Erro', description: 'Colunas inválidas.', variant: 'destructive' }); return; }
         const { error } = await supabase.from('guests').insert(guestsToInsert);
         if (error) toast({ title: 'Erro', description: 'Falha no banco.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: `${guestsToInsert.length} importados!` }); await logActivity('Importou', 'Excel'); await fetchGuests(); }
       } catch (err) { toast({ title: 'Erro', description: 'Arquivo inválido.', variant: 'destructive' }); }
@@ -224,8 +223,8 @@ export default function EventManagement() {
       name: eventSettings.name, date: new Date(eventSettings.date).toISOString(),
       wifi_ssid: eventSettings.wifi_ssid || null, wifi_pass: eventSettings.wifi_pass || null,
       photo_url: eventSettings.photo_url || null, 
-      wifi_img_url: eventSettings.wifi_img_url || null, // Arte TV
-      photo_img_url: eventSettings.photo_img_url || null, // Arte Celular
+      wifi_img_url: eventSettings.wifi_img_url || null, 
+      photo_img_url: eventSettings.photo_img_url || null, 
     }).eq('id', id);
     if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Salvo!' }); await logActivity('Atualizou configurações', 'Alterações salvas'); fetchEvent(); }
     setSaving(false);
@@ -238,15 +237,30 @@ export default function EventManagement() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* CSS IMPRESSÃO CORRIGIDO: FONTE 14pt e SEM CAIXA ALTA FORÇADA */}
       <style>{`
         @media print {
           @page { size: 90mm 35mm; margin: 0; }
           body * { visibility: hidden; }
           .print-label, .print-label * { visibility: visible !important; }
-          .print-label { position: fixed; top: 0; left: 0; width: 90mm; height: 35mm; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; color: black; text-align: center; padding: 2mm; box-sizing: border-box; overflow: hidden; }
+          .print-label { position: fixed; top: 0; left: 0; width: 90mm; height: 35mm; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; color: black; text-align: center; padding: 0 3mm; box-sizing: border-box; overflow: hidden; }
           .label-page-break { page-break-after: always; }
-          .guest-name { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 14pt !important; line-height: 1.1; width: 100%; white-space: normal; word-wrap: break-word; margin-bottom: 1.5mm; text-transform: uppercase; }
-          .guest-company { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10pt !important; width: 100%; white-space: normal; overflow: hidden; text-overflow: ellipsis; color: #333; }
+          
+          /* AJUSTE: Fonte 14pt e sem uppercase para caber nomes longos com naturalidade */
+          .guest-name { 
+            font-family: 'Inter', sans-serif; 
+            font-weight: 800; 
+            font-size: 14pt !important; 
+            line-height: 1.1; 
+            width: 100%; 
+            white-space: normal; 
+            word-wrap: break-word; 
+            margin-bottom: 1.5mm; 
+            /* text-transform: uppercase; REMOVIDO A PEDIDO */
+          }
+          .guest-company { 
+            font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10pt !important; width: 100%; white-space: normal; overflow: hidden; text-overflow: ellipsis; color: #333; 
+          }
         }
       `}</style>
 
@@ -282,13 +296,12 @@ export default function EventManagement() {
               <Dialog open={addGuestOpen} onOpenChange={setAddGuestOpen}><DialogTrigger asChild><Button variant="outline" className="border-border"><Plus className="h-4 w-4 mr-2" />Manual</Button></DialogTrigger><DialogContent className="bg-card border-border"><DialogHeader><DialogTitle>Adicionar Convidado</DialogTitle></DialogHeader><form onSubmit={handleAddGuest} className="space-y-4 mt-4"><Input placeholder="Nome" value={newGuest.name} onChange={e=>setNewGuest({...newGuest, name: e.target.value})} required className="bg-secondary border-border" /><Input placeholder="Empresa" value={newGuest.company} onChange={e=>setNewGuest({...newGuest, company: e.target.value})} className="bg-secondary border-border" /><Input placeholder="Cargo" value={newGuest.role} onChange={e=>setNewGuest({...newGuest, role: e.target.value})} className="bg-secondary border-border" /><Button type="submit" className="w-full bg-primary" disabled={adding}>Adicionar</Button></form></DialogContent></Dialog>
             </div>
             <div className="space-y-3">
-              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div>
-              <div className="flex items-center gap-3 shrink-0">
-                {/* BOTÃO DE EDITAR (LÁPIS) - SÓ PARA ADM/EQUIPE */}
+              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">
+                {/* BOTÃO DE EDIÇÃO (LÁPIS) - Só para Admin/Equipe */}
                 {canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }} className="hover:text-primary"><Pencil className="h-4 w-4"/></Button>}
+                
                 <Button variant="ghost" size="icon" onClick={()=>handlePrint(g)}><Printer className="h-4 w-4"/></Button>
-                {canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/>
-              </div></div>))}
+                {canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
             </div>
           </TabsContent>
 
@@ -333,7 +346,6 @@ export default function EventManagement() {
                       <div className="space-y-1"><Label>SSID Wi-Fi</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div>
                       <div className="space-y-1"><Label>Senha Wi-Fi</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div>
                       <div className="space-y-1"><Label>Link Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border"/></div>
-                      <p className="text-xs text-muted-foreground mt-2">Estes dados geram os QR Codes mobile.</p>
                     </div>
                   </div>
                 </div>
