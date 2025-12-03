@@ -369,28 +369,69 @@ export default function EventManagement() {
     <div className="min-h-screen bg-background">
       
       {/* CORREÇÃO 2: CSS DE IMPRESSÃO COM FONTE FIXA */}
-      <style>{`
+     <style>{`
         @media print {
-          @page { size: 90mm 35mm; margin: 0; }
+          /* Configuração exata da página para não soltar papel em branco */
+          @page { 
+            size: 90mm 35mm; 
+            margin: 0; 
+          }
+          
           body * { visibility: hidden; }
+          
+          /* Garante que só a etiqueta apareça */
           .print-label, .print-label * { visibility: visible !important; }
+          
           .print-label {
-            position: fixed; top: 0; left: 0; width: 90mm; height: 35mm;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: white; color: black; text-align: center;
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 90mm; 
+            height: 35mm;
+            
+            /* Centralização perfeita */
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center;
+            text-align: center;
+            
+            background: white; 
+            color: black;
+            
+            /* Margem de segurança interna */
+            padding: 2mm; 
+            box-sizing: border-box;
+            overflow: hidden; /* Corta qualquer excesso que tentaria criar nova página */
           }
+          
           .label-page-break { page-break-after: always; }
+          
+          /* ESTILO LINDO E FUNCIONAL */
           .guest-name {
-            font-family: sans-serif; font-weight: 900; 
-            font-size: 24pt !important; /* TAMANHO FIXO */
-            line-height: 1.1; margin-bottom: 2mm; width: 88mm;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            text-transform: uppercase;
+            font-family: 'Inter', sans-serif; /* Fonte moderna */
+            font-weight: 800; /* Negrito forte */
+            font-size: 16pt !important; /* Tamanho ideal: nem gigante, nem pequeno */
+            line-height: 1.1; 
+            
+            /* Permite quebra de linha inteligente */
+            width: 100%; 
+            white-space: normal; 
+            word-wrap: break-word;
+            
+            margin-bottom: 1.5mm;
+            text-transform: uppercase; /* Caixa alta elegante */
           }
+          
           .guest-company {
-            font-family: Arial, sans-serif; 
-            font-size: 12pt !important; /* TAMANHO FIXO */
-            width: 88mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            font-family: 'Inter', sans-serif; 
+            font-weight: 500;
+            font-size: 10pt !important; 
+            width: 100%; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis;
+            color: #333;
           }
         }
       `}</style>
