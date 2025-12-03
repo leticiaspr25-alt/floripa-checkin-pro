@@ -46,39 +46,19 @@ interface ActivityLog {
   details: string | null;
 }
 
-// --- FUNÇÃO DE NOME INTELIGENTE ---
+// --- FUNÇÃO DE NOME INTELIGENTE (Title Case + Completo) ---
 const formatNameForBadge = (fullName: string) => {
   if (!fullName) return "";
+  
   const prepositions = ["da", "de", "do", "das", "dos", "e"];
   const parts = fullName.trim().split(/\s+/);
   
-  if (parts.length <= 3) {
-    return parts.map((word, index) => {
-      const lower = word.toLowerCase();
-      if (prepositions.includes(lower) && index !== 0) return lower;
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    }).join(' ');
-  }
-
-  let formattedName = [];
-  let surnamesCount = 0;
-
-  for (let i = 0; i < parts.length; i++) {
-    let word = parts[i].toLowerCase();
-    let displayWord = word;
-    if (!prepositions.includes(word) || i === 0) {
-      displayWord = word.charAt(0).toUpperCase() + word.slice(1);
-    } else {
-      displayWord = word;
-    }
-    formattedName.push(displayWord);
-    if (i > 0 && !prepositions.includes(word)) {
-      surnamesCount++;
-    }
-    if (surnamesCount >= 2) break;
-  }
-  
-  return formattedName.join(' ');
+  // Capitaliza as palavras, mantendo preposições em minúsculo (exceto a primeira palavra)
+  return parts.map((word, index) => {
+    const lower = word.toLowerCase();
+    if (prepositions.includes(lower) && index !== 0) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(' ');
 };
 
 // --- UPLOAD BOX ---
@@ -98,7 +78,7 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
       onUpload(data.publicUrl);
-      toast({ title: "Sucesso", description: "Imagem salva." });
+      toast({ title: "Sucesso", description: "Imagem carregada." });
     } catch (error: any) {
       const url = URL.createObjectURL(file);
       onUpload(url);
@@ -111,7 +91,13 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
   return (
     <div className="border-2 border-dashed border-border bg-card/50 rounded-xl h-48 flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all group relative overflow-hidden" onClick={() => !uploading && inputRef.current?.click()}>
       <input type="file" hidden ref={inputRef} onChange={handleFileChange} accept="image/*" disabled={uploading} />
-      {uploading ? <div className="flex flex-col items-center gap-2"><Loader2 className="h-8 w-8 animate-spin text-primary" /><span className="text-xs text-muted-foreground">Enviando...</span></div> : previewUrl ? <div className="absolute inset-0 w-full h-full"><img src={previewUrl} className="w-full h-full object-contain p-4" alt="Preview" /><div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm"><span className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-bold shadow-xl transform translate-y-2 group-hover:translate-y-0 transition-transform">Trocar</span></div></div> : <div className="flex flex-col items-center gap-3 text-muted-foreground group-hover:text-primary transition-colors"><div className="p-4 bg-secondary rounded-full group-hover:bg-primary/20 transition-colors">{icon === 'image' ? <ImageIcon size={28} /> : <Upload size={28} />}</div><div className="text-center"><span className="block text-sm font-bold uppercase tracking-widest">{label}</span><span className="text-xs opacity-60">Clique para selecionar</span></div></div>}
+      {uploading ? (
+        <div className="flex flex-col items-center gap-2"><Loader2 className="h-8 w-8 animate-spin text-primary" /><span className="text-xs text-muted-foreground">Enviando...</span></div>
+      ) : previewUrl ? (
+        <div className="absolute inset-0 w-full h-full"><img src={previewUrl} className="w-full h-full object-contain p-4" alt="Preview" /><div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm"><span className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-bold shadow-xl transform translate-y-2 group-hover:translate-y-0 transition-transform">Trocar Imagem</span></div></div>
+      ) : (
+        <div className="flex flex-col items-center gap-3 text-muted-foreground group-hover:text-primary transition-colors"><div className="p-4 bg-secondary rounded-full group-hover:bg-primary/20 transition-colors">{icon === 'image' ? <ImageIcon size={28} /> : <Upload size={28} />}</div><div className="text-center"><span className="block text-sm font-bold uppercase tracking-widest">{label}</span><span className="text-xs opacity-60">Clique para selecionar</span></div></div>
+      )}
     </div>
   );
 }
@@ -242,41 +228,24 @@ export default function EventManagement() {
   return (
     <div className="min-h-screen bg-background">
       
-      {/* CSS IMPRESSÃO BLINDADO: 
-          - Force Background White (Corrige a foto preta)
-          - Max-Height: 35mm (Corrige o pular linhas)
-          - Fonte 14pt (Padrão pedido)
-      */}
+      {/* CSS IMPRESSÃO BLINDADO: CORREÇÃO DE COR E ALTURA (SOLUÇÃO FINAL) */}
       <style>{`
         @media print {
           @page { size: 90mm 35mm; margin: 0; }
           
-          body, html, #root, .min-h-screen {
-            background-color: white !important;
-            color: black !important;
-            overflow: visible !important;
-            height: auto !important;
-            margin: 0 !important;
-            padding: 0 !important;
+          body * { visibility: hidden; }
+          
+          .print-label, .print-label * { 
+            visibility: visible !important; 
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact;
           }
           
-          /* Esconde tudo que não é etiqueta */
-          body > *:not(.print-container) {
-            display: none !important;
-          }
-          
-          .print-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-          }
-
           .print-label { 
-            position: relative;
+            position: relative; 
             width: 90mm; 
-            height: 35mm; /* TRAVA DE ALTURA */
-            max-height: 35mm;
+            height: 35mm; 
+            max-height: 35mm; /* TRAVA FINAL DE ALTURA */
             
             display: flex; 
             flex-direction: column; 
@@ -284,38 +253,34 @@ export default function EventManagement() {
             align-items: center; 
             text-align: center; 
             
-            background: white !important; 
-            color: black !important; 
+            background: white !important; /* FORÇA O FUNDO BRANCO */
+            color: black !important; /* FORÇA O TEXTO PRETO */
             
             padding: 0 2mm; 
             box-sizing: border-box; 
-            overflow: hidden; /* CORTA SE PASSAR */
-            page-break-after: always;
+            overflow: hidden; /* CORTA QUALQUER COISA QUE TENTE SAIR */
+            page-break-after: always; /* Garante que saia em folha nova */
           }
           
-          /* Remove quebra da última para economizar papel */
-          .print-label:last-child { page-break-after: auto; }
+          .print-label:last-child { page-break-after: auto; } /* Economia de papel no último */
           
           .guest-name { 
             font-family: 'Inter', sans-serif; font-weight: 800; 
-            font-size: 14pt !important; /* Tamanho 14pt */
-            line-height: 1.1; 
-            width: 100%; 
+            font-size: 14pt !important; /* TAMANHO 14pt */
+            line-height: 1.1; width: 100%; 
             
-            /* Limita a 1 linha se quiser, ou 2 no máximo */
-            white-space: normal; 
-            max-height: 28mm; /* Segurança */
+            white-space: normal; /* Permite quebra, mas o espaço é pequeno */
             word-wrap: break-word; 
             
-            margin-bottom: 1mm; 
+            margin-bottom: 1.5mm; 
             color: black !important;
+            /* SEM UPPERCASE */
           }
           
           .guest-company { 
             font-family: 'Inter', sans-serif; font-weight: 500; 
-            font-size: 9pt !important; 
-            width: 100%; 
-            white-space: nowrap; 
+            font-size: 9pt !important; width: 100%; 
+            white-space: normal; 
             overflow: hidden; 
             text-overflow: ellipsis; 
             color: black !important;
@@ -328,6 +293,7 @@ export default function EventManagement() {
         <div className="print-container">
           <div className="print-label">
             <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
+            {/* Empresa só aparece se existir */}
             {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
           </div>
           <div className="print-label">
@@ -370,7 +336,7 @@ export default function EventManagement() {
               {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">
                 {canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }}><Pencil className="h-4 w-4"/></Button>}
                 <Button variant="ghost" size="icon" onClick={()=>handlePrint(g)}><Printer className="h-4 w-4"/></Button>
-                {canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
+                {canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteUser(g.id)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
             </div>
           </TabsContent>
 
