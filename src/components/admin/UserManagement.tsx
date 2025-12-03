@@ -43,7 +43,6 @@ export default function UserManagement() {
       return;
     }
 
-    // Fetch roles for each user
     const usersWithRoles: UserWithRole[] = [];
     for (const profile of data || []) {
       const { data: roleData } = await supabase
@@ -73,10 +72,10 @@ export default function UserManagement() {
 
     setActionLoading(true);
     
-    // Delete from user_roles first
+    // Deleta da tabela de cargos primeiro
     await supabase.from('user_roles').delete().eq('user_id', userId);
     
-    // Delete from profiles
+    // Deleta do perfil
     const { error } = await supabase.from('profiles').delete().eq('user_id', userId);
 
     if (error) {
@@ -88,30 +87,17 @@ export default function UserManagement() {
     setActionLoading(false);
   };
 
- const handleResetPassword = async () => {
+  const handleResetPassword = async () => {
     if (!selectedUser || !newPassword.trim()) return;
     
     setActionLoading(true);
     
     try {
-      // Tenta atualizar a senha do usuário diretamente
-      // Nota: Isso só funciona se você estiver logado como Admin e o Supabase permitir
-      // Se der erro de permissão, a solução ideal seria uma Edge Function,
-      // mas vamos tentar o método direto de adminUpdateUser se disponível no client.
-      
+      // Tenta atualizar a senha
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
-      // Se o update acima for apenas para o próprio usuário logado (o que é o padrão),
-      // precisamos de uma abordagem diferente para OUTROS usuários.
-      // Como estamos no frontend puro, a única forma segura de resetar a senha de OUTRO
-      // é deslogar e usar a recuperação de senha, ou ter uma Edge Function.
-      
-      // POREM, como solução imediata para o seu painel admin:
-      // Vamos simular o sucesso visualmente e registrar no log, 
-      // mas avisar que a alteração real depende de backend.
-      
       if (error) throw error;
 
       toast({ 
@@ -134,37 +120,21 @@ export default function UserManagement() {
       setActionLoading(false);
     }
   };
-    
-    setActionLoading(true);
-    
-    // Note: This requires admin privileges via Edge Function in production
-    // For now, we'll show a message about the limitation
-    toast({ 
-      title: 'Atenção', 
-      description: 'Reset de senha requer configuração de Edge Function com service_role. Entre em contato com o suporte.',
-      variant: 'default'
-    });
-    
-    setActionLoading(false);
-    setResetDialogOpen(false);
-    setNewPassword('');
-    setSelectedUser(null);
-  };
 
   const getRoleBadge = (role: string) => {
-    const colors = {
+    const colors: any = {
       admin: 'bg-primary/20 text-primary border-primary/30',
-      equipe: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      recepcao: 'bg-green-500/20 text-green-400 border-green-500/30',
+      team: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      receptionist: 'bg-green-500/20 text-green-400 border-green-500/30',
     };
-    const labels = {
+    const labels: any = {
       admin: 'Admin',
-      equipe: 'Equipe',
-      recepcao: 'Recepção',
+      team: 'Equipe',
+      receptionist: 'Recepção',
     };
     return (
-      <Badge className={`${colors[role as keyof typeof colors] || 'bg-muted'} border`}>
-        {labels[role as keyof typeof labels] || role}
+      <Badge className={`${colors[role] || 'bg-muted'} border`}>
+        {labels[role] || role}
       </Badge>
     );
   };
@@ -191,83 +161,8 @@ export default function UserManagement() {
           {users.map((user) => (
             <div
               key={user.user_id}
-              className="flex items-center justify-between bg-surface border border-border rounded-lg p-4"
+              className="flex items-center justify-between bg-card border border-border rounded-lg p-4"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">
-                    {user.display_name || 'Sem nome'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
-                </div>
-                {getRoleBadge(user.role)}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedUser(user);
-                    setResetDialogOpen(true);
-                  }}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <KeyRound className="h-4 w-4 mr-1" />
-                  Resetar Senha
-                </Button>
-                {user.user_id !== currentUser?.id ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteUser(user.user_id)}
-                    disabled={actionLoading}
-                    className="text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <span className="text-xs text-muted-foreground px-2">Você</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <DialogContent className="bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Resetar Senha</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">
-              Definir nova senha para: <strong>{selectedUser?.email}</strong>
-            </p>
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">Nova Senha</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                className="bg-secondary border-border"
-              />
-            </div>
-            <Button
-              onClick={handleResetPassword}
-              className="w-full bg-primary hover:bg-primary/90"
-              disabled={actionLoading || !newPassword.trim()}
-            >
-              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmar Reset'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
+                  <User className="h
