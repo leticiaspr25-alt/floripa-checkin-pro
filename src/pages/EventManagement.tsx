@@ -48,16 +48,8 @@ interface ActivityLog {
 }
 
 // --- Componente Auxiliar: UploadBox ---
-interface UploadBoxProps {
-  label: string;
-  icon?: 'qr-code' | 'image';
-  previewUrl?: string | null;
-  onUpload: (url: string) => void;
-}
-
-function UploadBox({ label, icon, previewUrl, onUpload }: UploadBoxProps) {
+function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?: 'qr-code' | 'image', previewUrl?: string | null, onUpload: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -65,14 +57,12 @@ function UploadBox({ label, icon, previewUrl, onUpload }: UploadBoxProps) {
       onUpload(url);
     }
   };
-
   return (
     <div 
       className="border-2 border-dashed border-border bg-card/50 rounded-xl h-48 flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all group relative overflow-hidden"
       onClick={() => inputRef.current?.click()}
     >
       <input type="file" hidden ref={inputRef} onChange={handleFileChange} accept="image/*" />
-      
       {previewUrl ? (
         <div className="absolute inset-0 w-full h-full">
           <img src={previewUrl} className="w-full h-full object-contain p-4" alt="Preview" />
@@ -122,7 +112,7 @@ export default function EventManagement() {
     photo_url: '',
     wifi_img_url: '',
     photo_img_url: '',
-    layout_mode: 'standard', // Novo estado
+    layout_mode: 'standard',
   });
   const [photoMode, setPhotoMode] = useState<'auto' | 'upload'>('auto');
   const [saving, setSaving] = useState(false);
@@ -135,9 +125,7 @@ export default function EventManagement() {
 
   const logActivity = async (action: string, details: string) => {
     if (!user || !id) return;
-    await supabase.from('activity_logs').insert({
-      event_id: id, user_id: user.id, user_email: user.email, action, details,
-    });
+    await supabase.from('activity_logs').insert({ event_id: id, user_id: user.id, user_email: user.email, action, details });
   };
 
   useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
@@ -161,7 +149,7 @@ export default function EventManagement() {
         photo_url: data.photo_url || '',
         wifi_img_url: data.wifi_img_url || '',
         photo_img_url: data.photo_img_url || '',
-        layout_mode: (data.layout_mode as 'standard' | 'full_screen') || 'standard',
+        layout_mode: (data.layout_mode as any) || 'standard',
       });
       if (data.photo_img_url) setPhotoMode('upload');
     }
@@ -182,35 +170,23 @@ export default function EventManagement() {
   };
 
   const subscribeToGuests = () => {
-    const channel = supabase.channel('guests-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'guests', filter: `event_id=eq.${id}` }, () => fetchGuests())
-      .subscribe();
+    const channel = supabase.channel('guests-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'guests', filter: `event_id=eq.${id}` }, () => fetchGuests()).subscribe();
     return () => { supabase.removeChannel(channel); };
   };
 
   const handleToggleCheckIn = async (guest: Guest) => {
     const newCheckedIn = !guest.checked_in;
-    const { error } = await supabase.from('guests').update({
-      checked_in: newCheckedIn,
-      checkin_time: newCheckedIn ? new Date().toISOString() : null,
-    }).eq('id', guest.id);
+    const { error } = await supabase.from('guests').update({ checked_in: newCheckedIn, checkin_time: newCheckedIn ? new Date().toISOString() : null }).eq('id', guest.id);
     if (error) toast({ title: 'Erro', description: 'Falha ao atualizar check-in.', variant: 'destructive' });
-    else await logActivity(newCheckedIn ? 'Check-in' : 'Check-out', `${guest.name}${guest.company ? ` (${guest.company})` : ''}`);
+    else await logActivity(newCheckedIn ? 'Check-in' : 'Check-out', `${guest.name}`);
   };
 
   const handleAddGuest = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdding(true);
-    const { error } = await supabase.from('guests').insert({
-      event_id: id, name: newGuest.name, company: newGuest.company || null, role: newGuest.role || null,
-    });
+    const { error } = await supabase.from('guests').insert({ event_id: id, name: newGuest.name, company: newGuest.company || null, role: newGuest.role || null });
     if (error) toast({ title: 'Erro', description: 'Falha ao adicionar.', variant: 'destructive' });
-    else {
-      toast({ title: 'Sucesso', description: 'Convidado adicionado!' });
-      await logActivity('Adicionou convidado', `${newGuest.name}`);
-      setAddGuestOpen(false);
-      setNewGuest({ name: '', company: '', role: '' });
-    }
+    else { toast({ title: 'Sucesso', description: 'Convidado adicionado!' }); await logActivity('Adicionou convidado', `${newGuest.name}`); setAddGuestOpen(false); setNewGuest({ name: '', company: '', role: '' }); }
     setAdding(false);
   };
 
@@ -223,9 +199,7 @@ export default function EventManagement() {
       const data = evt.target?.result;
       const workbook = XLSX.read(data, { type: 'binary' });
       const jsonData = XLSX.utils.sheet_to_json<any>(workbook.Sheets[workbook.SheetNames[0]]);
-      const guestsToInsert = jsonData.map((row: any) => ({
-        event_id: id, name: row.nome || row.name || '', company: row.empresa || row.company || null, role: row.cargo || row.role || null,
-      })).filter((g: any) => g.name);
+      const guestsToInsert = jsonData.map((row: any) => ({ event_id: id, name: row.nome || row.name || '', company: row.empresa || row.company || null, role: row.cargo || row.role || null })).filter((g: any) => g.name);
       if (guestsToInsert.length === 0) { toast({ title: 'Erro', description: 'Nenhum convidado válido.', variant: 'destructive' }); return; }
       const { error } = await supabase.from('guests').insert(guestsToInsert);
       if (error) toast({ title: 'Erro', description: 'Falha ao importar.', variant: 'destructive' });
@@ -237,11 +211,7 @@ export default function EventManagement() {
 
   const handleExportExcel = async () => {
     if (!canImportExport) return;
-    const exportData = guests.map(g => ({
-      Nome: g.name, Empresa: g.company || '', Cargo: g.role || '',
-      'Check-in': g.checked_in ? 'Sim' : 'Não',
-      'Hora': g.checkin_time ? new Date(g.checkin_time).toLocaleString('pt-BR') : '',
-    }));
+    const exportData = guests.map(g => ({ Nome: g.name, Empresa: g.company || '', Cargo: g.role || '', 'Check-in': g.checked_in ? 'Sim' : 'Não', 'Hora': g.checkin_time ? new Date(g.checkin_time).toLocaleString('pt-BR') : '' }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Convidados');
@@ -263,13 +233,8 @@ export default function EventManagement() {
       photo_img_url: eventSettings.photo_img_url || null,
       layout_mode: eventSettings.layout_mode,
     }).eq('id', id);
-
     if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' });
-    else {
-      toast({ title: 'Sucesso', description: 'Configurações salvas!' });
-      await logActivity('Atualizou configurações', 'Alterações salvas');
-      fetchEvent();
-    }
+    else { toast({ title: 'Sucesso', description: 'Configurações salvas!' }); await logActivity('Atualizou configurações', 'Alterações salvas'); fetchEvent(); }
     setSaving(false);
   };
 
@@ -285,11 +250,7 @@ export default function EventManagement() {
     setTimeout(() => { window.print(); setPrintingGuest(null); }, 100);
   };
 
-  const filteredGuests = guests.filter(g =>
-    g.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    g.company?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
+  const filteredGuests = guests.filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.company?.toLowerCase().includes(searchTerm.toLowerCase()));
   const formatLogTime = (ts: string) => new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
   if (authLoading || loading) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -347,18 +308,17 @@ export default function EventManagement() {
           {canAccessSettings && (
             <TabsContent value="settings" className="space-y-6 animate-fade-in">
               <form onSubmit={handleSaveSettings} className="space-y-8">
-                
-                {/* --- SELETOR DE MODO --- */}
+                {/* SELETOR DE MODO */}
                 <div className="bg-secondary/50 border border-border rounded-xl p-6">
                   <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2"><LayoutTemplate className="h-5 w-5 text-primary" /> Modo de Exibição Pública</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'standard' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'standard'})}>
-                      <div className="font-bold text-foreground mb-1">Layout Padrão (Automático)</div>
-                      <p className="text-xs text-muted-foreground">Você preenche os dados (SSID, Senha, Links) e o sistema desenha a tela.</p>
+                      <div className="font-bold text-foreground mb-1">Layout Padrão</div>
+                      <p className="text-xs text-muted-foreground">O sistema desenha a tela com SSID e Senha.</p>
                     </div>
                     <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'full_screen' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'full_screen'})}>
                       <div className="font-bold text-foreground mb-1">Arte Digital (Tela Cheia)</div>
-                      <p className="text-xs text-muted-foreground">Use a arte pronta do evento (ex: Kotai Summit). O sistema exibe apenas a imagem.</p>
+                      <p className="text-xs text-muted-foreground">Exibe apenas a imagem que você subir (100% da tela).</p>
                     </div>
                   </div>
                 </div>
@@ -369,23 +329,21 @@ export default function EventManagement() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* --- WI-FI --- */}
                   <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Wifi size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte TV / Tablet' : 'Conexão Wi-Fi'}</h3></div>
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Wifi size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte TV' : 'Wi-Fi'}</h3></div>
                     {eventSettings.layout_mode === 'standard' ? (
                       <div className="space-y-4">
                         <div className="space-y-1"><Label>SSID</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div>
                         <div className="space-y-1"><Label>Senha</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div>
-                        <UploadBox label="QR Code do Wi-Fi" icon="qr-code" previewUrl={eventSettings.wifi_img_url} onUpload={url=>setEventSettings({...eventSettings, wifi_img_url: url})} />
+                        <UploadBox label="QR Code Wi-Fi" icon="qr-code" previewUrl={eventSettings.wifi_img_url} onUpload={url=>setEventSettings({...eventSettings, wifi_img_url: url})} />
                       </div>
                     ) : (
-                      <div className="space-y-4"><Label>Upload da Arte Horizontal (1920x1080)</Label><UploadBox label="Arraste a Arte Horizontal" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={url=>setEventSettings({...eventSettings, wifi_img_url: url})} /></div>
+                      <div className="space-y-4"><Label>Upload da Arte (1920x1080)</Label><UploadBox label="Arraste a Arte Horizontal" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={url=>setEventSettings({...eventSettings, wifi_img_url: url})} /></div>
                     )}
                   </div>
 
-                  {/* --- MOMENTS / TOTEM --- */}
                   <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><ExternalLink size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte Totem' : 'Moments'}</h3></div>
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Monitor size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte Totem' : 'Moments'}</h3></div>
                     {eventSettings.layout_mode === 'standard' ? (
                       <div className="space-y-4">
                         <div className="space-y-1"><Label>Link Galeria</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border"/></div>
@@ -407,7 +365,7 @@ export default function EventManagement() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4"><Label>Upload da Arte Vertical (1080x1920)</Label><UploadBox label="Arraste a Arte Vertical" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
+                      <div className="space-y-4"><Label>Upload da Arte (1080x1920)</Label><UploadBox label="Arraste a Arte Vertical" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
                     )}
                   </div>
                 </div>
