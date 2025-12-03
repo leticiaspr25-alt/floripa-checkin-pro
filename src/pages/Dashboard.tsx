@@ -8,14 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Calendar, LogOut, Loader2, Users, KeyRound } from 'lucide-react';
+import { Plus, Calendar, LogOut, Loader2, Users, KeyRound, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 
-// Se você tiver componentes separados para UserManagement e AccessCodeManagement, importe-os aqui.
-// Caso contrário, vou deixar placeholders visuais para não quebrar o código.
-
+// --- Interfaces ---
 interface Event {
   id: string;
   name: string;
@@ -47,7 +45,7 @@ export default function Dashboard() {
   }, [user]);
 
   const fetchEvents = async () => {
-    // --- CORREÇÃO APLICADA AQUI: Removemos o .eq('user_id') para mostrar tudo ---
+    // CORREÇÃO: Removemos o filtro de user_id para mostrar todos os eventos
     const { data, error } = await supabase
       .from('events')
       .select('*')
@@ -66,15 +64,13 @@ export default function Dashboard() {
     if (!user) return;
 
     setCreating(true);
-    // Inserindo o evento ligado ao usuário atual
     const { error } = await supabase.from('events').insert({
       name: newEventName,
       date: new Date(newEventDate).toISOString(),
-      user_id: user.id, 
+      user_id: user.id,
     });
 
     if (error) {
-      console.error(error);
       toast({ title: 'Erro', description: 'Falha ao criar evento.', variant: 'destructive' });
     } else {
       toast({ title: 'Sucesso', description: 'Evento criado!' });
@@ -135,7 +131,6 @@ export default function Dashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* LÓGICA DE ABAS PARA ADMIN */}
         {isAdmin ? (
           <Tabs defaultValue="events" className="space-y-6">
             <TabsList className="bg-card border border-border">
@@ -165,30 +160,27 @@ export default function Dashboard() {
                 handleCreateEvent={handleCreateEvent}
                 creating={creating}
                 navigate={navigate}
-                canCreate={true}
+                canCreate={!isRecepcao}
               />
             </TabsContent>
 
             <TabsContent value="users">
-              <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <div className="bg-card border border-border rounded-xl p-6 text-center">
+                <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-medium text-foreground">Gestão de Usuários</h3>
-                <p>Aqui você poderá excluir membros e resetar senhas.</p>
-                {/* Se você tiver o componente <UserManagement />, descomente e use aqui */}
+                <p className="text-muted-foreground mb-4">Em breve: Lista de usuários e reset de senha.</p>
               </div>
             </TabsContent>
 
             <TabsContent value="access">
-              <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground">
-                <KeyRound className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <div className="bg-card border border-border rounded-xl p-6 text-center">
+                <KeyRound className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-medium text-foreground">Chaves de Acesso</h3>
-                <p>Aqui você poderá alterar os códigos mestres (Admin, Equipe, Recepção).</p>
-                {/* Se você tiver o componente <AccessCodeManagement />, descomente e use aqui */}
+                <p className="text-muted-foreground mb-4">Em breve: Edição dos códigos mestres.</p>
               </div>
             </TabsContent>
           </Tabs>
         ) : (
-          /* VISÃO PARA EQUIPE E RECEPÇÃO (SEM ABAS DE GESTÃO) */
           <EventsSection 
             events={events}
             createDialogOpen={createDialogOpen}
@@ -208,7 +200,7 @@ export default function Dashboard() {
   );
 }
 
-// --- SUB-COMPONENTE DA LISTA DE EVENTOS ---
+// --- Componente Auxiliar de Lista ---
 interface EventsSectionProps {
   events: Event[];
   createDialogOpen: boolean;
@@ -269,7 +261,7 @@ function EventsSection({
           </div>
           <h3 className="text-lg font-medium text-foreground mb-2">Nenhum evento encontrado</h3>
           <p className="text-muted-foreground">
-            {canCreate ? 'Crie seu primeiro evento para começar.' : 'Aguarde a criação de eventos pelo administrador.'}
+            {canCreate ? 'Crie seu primeiro evento para começar.' : 'Aguarde a criação de eventos.'}
           </p>
         </div>
       ) : (
@@ -281,10 +273,7 @@ function EventsSection({
               className="bg-card hover:bg-secondary border border-border rounded-xl p-6 cursor-pointer transition-all duration-200 hover:border-primary/50 animate-fade-in group relative overflow-hidden"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0">
-                 <ArrowRightIcon className="text-primary h-5 w-5" />
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2 line-clamp-2 pr-6">{event.name}</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-2 line-clamp-2">{event.name}</h3>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4 text-primary" />
                 <span className="text-sm">
@@ -296,15 +285,5 @@ function EventsSection({
         </div>
       )}
     </>
-  );
-}
-
-// Pequeno ícone auxiliar
-function ArrowRightIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M5 12h14" />
-      <path d="m12 5 7 7-7 7" />
-    </svg>
   );
 }
