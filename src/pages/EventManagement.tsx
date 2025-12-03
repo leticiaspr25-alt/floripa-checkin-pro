@@ -10,7 +10,6 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { QRCodeCanvas } from 'qrcode.react'; // Certifique-se de instalar: npm install qrcode.react
 import { 
   ArrowLeft, Search, Upload, Plus, Download, Settings, 
   Printer, Users, UserCheck, Loader2, ExternalLink, Trash2,
@@ -499,7 +498,15 @@ export default function EventManagement() {
                         <div className="h-64 flex items-center justify-center bg-background border-2 border-dashed border-border rounded-xl overflow-hidden">
                           {photoMode === 'auto' ? (
                             <div className="text-center p-4">
-                              {eventSettings.photo_url ? <div className="bg-white p-4 rounded-xl"><QRCodeCanvas value={eventSettings.photo_url} size={150} /></div> : <span className="text-muted-foreground text-sm">Cole o link acima para gerar o QR</span>}
+                              {eventSettings.photo_url ? (
+  <div className="bg-white p-4 rounded-xl">
+    <img 
+      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} 
+      alt="QR Code Galeria" 
+      className="w-[150px] h-[150px]"
+    />
+  </div>
+) : (: <span className="text-muted-foreground text-sm">Cole o link acima para gerar o QR</span>}
                               <p className="text-xs text-muted-foreground mt-3">QR gerado a partir do link</p>
                             </div>
                           ) : (
