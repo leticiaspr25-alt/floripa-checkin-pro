@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client'; // Falando direto com o chefe
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react'; // Importamos os ícones do olho
 import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
@@ -14,6 +14,10 @@ export default function Auth() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   
+  // Estados de Visibilidade da Senha
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   // Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,7 +33,6 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     
-    // Login direto no Supabase
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -39,7 +42,6 @@ export default function Auth() {
       toast({ title: "Erro no Login", description: error.message, variant: "destructive" });
       setLoading(false);
     } else {
-      // Sucesso! Vai pro Dashboard
       navigate('/dashboard');
     }
   };
@@ -48,30 +50,34 @@ export default function Auth() {
     e.preventDefault();
     
     if (newPassword !== confirmPassword) {
-      toast({ title: "Erro", description: "Senhas não conferem.", variant: "destructive" });
+      toast({ title: "Erro", description: "As senhas não coincidem.", variant: "destructive" });
       return;
     }
 
     // --- VALIDAÇÃO DAS CHAVES ---
+    // Nota: Em produção real, o ideal é validar isso no Backend (Edge Function),
+    // mas para este MVP, validamos aqui e salvamos o role no metadata.
+    
+    // Buscamos a chave no banco de dados (simulação via código fixo ou busca)
+    // Aqui mantemos a lógica simples de comparação direta para garantir funcionamento imediato
     let role = '';
     if (accessCode === 'MASTER_FLORIPA') role = 'admin';
     else if (accessCode === 'EQUIPE_2025') role = 'team';
     else if (accessCode === 'RECEPCAO_EVENTO') role = 'receptionist';
     else {
-      toast({ title: "Código Inválido", description: "Verifique o código de acesso.", variant: "destructive" });
+      toast({ title: "Acesso Negado", description: "O código de acesso informado é inválido.", variant: "destructive" });
       return;
     }
 
     setLoading(true);
 
-    // Cadastro direto no Supabase
     const { data, error } = await supabase.auth.signUp({
       email: newEmail,
       password: newPassword,
       options: {
         data: {
           full_name: newName,
-          role: role,
+          role: role, // Salva o cargo no perfil do usuário
         },
       },
     });
@@ -79,13 +85,11 @@ export default function Auth() {
     if (error) {
       toast({ title: "Erro no Cadastro", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Sucesso!", description: "Conta criada. Entrando..." });
-      // Se a confirmação de email estiver desligada, ele já loga.
-      // Se estiver ligada, ele avisa.
+      toast({ title: "Sucesso!", description: "Conta criada com sucesso! Entrando..." });
       if (data.session) {
         navigate('/dashboard');
       } else {
-        // Fallback: Tenta logar manualmente se não veio a sessão
+        // Fallback: Tenta logar manualmente se a sessão não vier automática
         const { error: loginError } = await supabase.auth.signInWithPassword({ email: newEmail, password: newPassword });
         if (!loginError) navigate('/dashboard');
       }
@@ -102,39 +106,136 @@ export default function Auth() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-black mb-6">
-              <TabsTrigger value="login">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 bg-black mb-6 border border-[#333]">
+              <TabsTrigger value="login" className="data-[state=active]:bg-[#f37021] data-[state=active]:text-white">Entrar</TabsTrigger>
+              <TabsTrigger value="signup" className="data-[state=active]:bg-[#f37021] data-[state=active]:text-white">Criar Conta</TabsTrigger>
             </TabsList>
             
+            {/* --- FORMULÁRIO DE LOGIN --- */}
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2"><Label>Email</Label><Input type="email" value={email} onChange={e=>setEmail(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
-                <div className="space-y-2"><Label>Senha</Label><Input type="password" value={password} onChange={e=>setPassword(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
-                <Button type="submit" className="w-full bg-[#f37021] hover:bg-[#d95d10]" disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : 'Acessar'}</Button>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input 
+                    type="email" 
+                    value={email} 
+                    onChange={e=>setEmail(e.target.value)} 
+                    required 
+                    className="bg-black border-[#333] text-white focus:border-[#f37021]" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Senha</Label>
+                  <div className="relative">
+                    <Input 
+                      type={showPassword ? "text" : "password"} 
+                      value={password} 
+                      onChange={e=>setPassword(e.target.value)} 
+                      required 
+                      className="bg-black border-[#333] text-white focus:border-[#f37021] pr-10" 
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-white"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <Button type="submit" className="w-full bg-[#f37021] hover:bg-[#d95d10] text-white font-bold" disabled={loading}>
+                  {loading ? <Loader2 className="animate-spin" /> : 'Acessar Sistema'}
+                </Button>
               </form>
             </TabsContent>
 
+            {/* --- FORMULÁRIO DE CADASTRO --- */}
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
-                <div className="space-y-2"><Label>Nome</Label><Input value={newName} onChange={e=>setNewName(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
-                <div className="space-y-2"><Label>Email</Label><Input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
-                <div className="space-y-2"><Label>Senha</Label><Input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
-                <div className="space-y-2"><Label>Confirmar Senha</Label><Input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
-                
-                {/* CAMPO DE CÓDIGO DE ACESSO */}
                 <div className="space-y-2">
-                  <Label className="text-[#f37021]">Código de Acesso</Label>
+                  <Label>Nome Completo</Label>
+                  <Input 
+                    value={newName} 
+                    onChange={e=>setNewName(e.target.value)} 
+                    required 
+                    className="bg-black border-[#333] text-white focus:border-[#f37021]" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email Corporativo</Label>
+                  <Input 
+                    type="email" 
+                    value={newEmail} 
+                    onChange={e=>setNewEmail(e.target.value)} 
+                    required 
+                    className="bg-black border-[#333] text-white focus:border-[#f37021]" 
+                  />
+                </div>
+                
+                {/* Senha com Olhinho */}
+                <div className="space-y-2">
+                  <Label>Senha</Label>
+                  <div className="relative">
+                    <Input 
+                      type={showPassword ? "text" : "password"} 
+                      value={newPassword} 
+                      onChange={e=>setNewPassword(e.target.value)} 
+                      required 
+                      className="bg-black border-[#333] text-white focus:border-[#f37021] pr-10" 
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-white"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Confirmar Senha com Olhinho */}
+                <div className="space-y-2">
+                  <Label>Confirmar Senha</Label>
+                  <div className="relative">
+                    <Input 
+                      type={showConfirmPassword ? "text" : "password"} 
+                      value={confirmPassword} 
+                      onChange={e=>setConfirmPassword(e.target.value)} 
+                      required 
+                      className="bg-black border-[#333] text-white focus:border-[#f37021] pr-10" 
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-white"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Código de Acesso (SEM PLACEHOLDER REVELADOR) */}
+                <div className="space-y-2 pt-2 border-t border-[#333] mt-2">
+                  <Label className="text-[#f37021] font-bold">Código de Acesso Corporativo</Label>
                   <Input 
                     value={accessCode} 
                     onChange={e=>setAccessCode(e.target.value)} 
-                    placeholder="MASTER_FLORIPA"
+                    placeholder="Digite o código fornecido pelo gestor"
                     required 
-                    className="bg-black border-[#f37021]/50 text-white" 
+                    className="bg-black border-[#f37021]/50 text-white focus:border-[#f37021]" 
                   />
+                  <p className="text-[10px] text-gray-500">Este código define seu nível de permissão.</p>
                 </div>
 
-                <Button type="submit" className="w-full bg-[#f37021] hover:bg-[#d95d10]" disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : 'Criar Conta'}</Button>
+                <Button type="submit" className="w-full bg-[#f37021] hover:bg-[#d95d10] text-white font-bold mt-4" disabled={loading}>
+                  {loading ? <Loader2 className="animate-spin" /> : 'Criar Conta'}
+                </Button>
               </form>
             </TabsContent>
           </Tabs>
