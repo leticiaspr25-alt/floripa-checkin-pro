@@ -47,33 +47,62 @@ interface ActivityLog {
   details: string | null;
 }
 
-// --- COMPONENTE VISUAL: CAIXA DE UPLOAD ---
+// --- COMPONENTE VISUAL: CAIXA DE UPLOAD (CORRIGIDO PARA UPLOAD REAL) ---
 function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?: 'qr-code' | 'image', previewUrl?: string | null, onUpload: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false); // Estado de carregamento
+  const { toast } = useToast();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Cria URL temporária para preview
+    if (!file) return;
+
+    setUploading(true); // Ativa o spinner
+    try {
+      // 1. Gera um nome único para o arquivo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      // 2. Envia para o Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('event-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // 3. Pega a URL pública do arquivo
+      const { data } = supabase.storage
+        .from('event-images')
+        .getPublicUrl(fileName);
+
+      // 4. Passa a URL real para o formulário
+      onUpload(data.publicUrl);
+      toast({ title: "Sucesso", description: "Imagem carregada na nuvem!" });
+
+    } catch (error: any) {
+      console.error('Erro upload:', error);
+      // Fallback: Se der erro (ex: bucket não criado), usa preview local
       const url = URL.createObjectURL(file);
       onUpload(url);
+      toast({ title: "Aviso", description: "Usando modo offline (Verifique o Storage).", variant: "destructive" });
+    } finally {
+      setUploading(false); // Desativa o spinner
     }
   };
 
   return (
     <div 
       className="border-2 border-dashed border-border bg-card/50 rounded-xl h-48 flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all group relative overflow-hidden"
-      onClick={() => inputRef.current?.click()}
+      onClick={() => !uploading && inputRef.current?.click()}
     >
-      <input 
-        type="file" 
-        hidden 
-        ref={inputRef} 
-        onChange={handleFileChange} 
-        accept="image/*" 
-      />
+      <input type="file" hidden ref={inputRef} onChange={handleFileChange} accept="image/*" disabled={uploading} />
       
-      {previewUrl ? (
+      {uploading ? (
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-xs text-muted-foreground">Enviando...</span>
+        </div>
+      ) : previewUrl ? (
         <div className="absolute inset-0 w-full h-full">
           <img src={previewUrl} className="w-full h-full object-contain p-4" alt="Preview" />
           <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity backdrop-blur-sm">
@@ -140,7 +169,6 @@ export default function EventManagement() {
   const canAccessSettings = isAdmin || isEquipe;
   const canAccessHistory = isAdmin || isEquipe;
 
-  // --- LOG DE ATIVIDADES ---
   const logActivity = async (action: string, details: string) => {
     if (!user || !id) return;
     await supabase.from('activity_logs').insert({
@@ -152,7 +180,6 @@ export default function EventManagement() {
     });
   };
 
-  // --- INICIALIZAÇÃO ---
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
@@ -233,6 +260,7 @@ export default function EventManagement() {
     else {
       toast({ title: 'Sucesso', description: 'Convidado adicionado!' });
       await logActivity('Adicionou convidado', `${newGuest.name}`);
+      await fetchGuests(); // Atualiza lista na hora
       setAddGuestOpen(false);
       setNewGuest({ name: '', company: '', role: '' });
     }
@@ -243,7 +271,10 @@ export default function EventManagement() {
     if (!canDeleteGuests) return;
     const { error } = await supabase.from('guests').delete().eq('id', guest.id);
     if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' });
-    else await logActivity('Excluiu convidado', `${guest.name}`);
+    else {
+      await logActivity('Excluiu convidado', `${guest.name}`);
+      await fetchGuests(); // Atualiza lista na hora
+    }
   };
 
   const handlePrint = (guest: Guest) => {
@@ -278,6 +309,7 @@ export default function EventManagement() {
       else {
         toast({ title: 'Sucesso', description: `${guestsToInsert.length} importados!` });
         await logActivity('Importou convidados', `${guestsToInsert.length} via Excel`);
+        await fetchGuests();
       }
     };
     reader.readAsBinaryString(file);
@@ -336,7 +368,33 @@ export default function EventManagement() {
   return (
     <div className="min-h-screen bg-background">
       
-      {/* Área de Impressão Oculta */}
+      {/* CORREÇÃO 2: CSS DE IMPRESSÃO COM FONTE FIXA */}
+      <style>{`
+        @media print {
+          @page { size: 90mm 35mm; margin: 0; }
+          body * { visibility: hidden; }
+          .print-label, .print-label * { visibility: visible !important; }
+          .print-label {
+            position: fixed; top: 0; left: 0; width: 90mm; height: 35mm;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: white; color: black; text-align: center;
+          }
+          .label-page-break { page-break-after: always; }
+          .guest-name {
+            font-family: sans-serif; font-weight: 900; 
+            font-size: 24pt !important; /* TAMANHO FIXO */
+            line-height: 1.1; margin-bottom: 2mm; width: 88mm;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            text-transform: uppercase;
+          }
+          .guest-company {
+            font-family: Arial, sans-serif; 
+            font-size: 12pt !important; /* TAMANHO FIXO */
+            width: 88mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          }
+        }
+      `}</style>
+
       {printingGuest && (
         <>
           <div className="print-label label-page-break">
@@ -378,7 +436,6 @@ export default function EventManagement() {
 
           {/* === ABA 1: CONVIDADOS === */}
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
-            {/* Cards de Métricas */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-card border border-border rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div>
@@ -390,7 +447,6 @@ export default function EventManagement() {
               </div>
             </div>
 
-            {/* Barra de Ações (Busca, Importar, Exportar, Manual) */}
             <div className="flex flex-wrap gap-3 items-center">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -419,7 +475,6 @@ export default function EventManagement() {
               </Dialog>
             </div>
 
-            {/* Lista de Convidados */}
             <div className="space-y-3">
               {filteredGuests.length === 0 ? <div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div> : filteredGuests.map((guest, index) => (
                 <div key={guest.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{ animationDelay: `${index * 30}ms` }}>
@@ -468,82 +523,66 @@ export default function EventManagement() {
             <TabsContent value="settings" className="space-y-6 animate-fade-in">
               <form onSubmit={handleSaveSettings} className="space-y-8">
                 
-                {/* 1. SELETOR DE MODO DE LAYOUT */}
                 <div className="bg-secondary/50 border border-border rounded-xl p-6">
                   <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2"><LayoutTemplate className="h-5 w-5 text-primary" /> Modo de Exibição Pública</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'standard' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'standard'})}>
-                      <div className="font-bold text-foreground mb-1">Layout Padrão (Automático)</div>
-                      <p className="text-xs text-muted-foreground">Você preenche SSID, Senha e Links. O sistema desenha a tela.</p>
+                      <div className="font-bold text-foreground mb-1">Layout Padrão</div>
+                      <p className="text-xs text-muted-foreground">Sistema desenha a tela com SSID/Senha.</p>
                     </div>
                     <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'full_screen' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'full_screen'})}>
-                      <div className="font-bold text-foreground mb-1">Arte Digital (Tela Cheia)</div>
-                      <p className="text-xs text-muted-foreground">Você sobe a imagem pronta (1920x1080). O sistema exibe só ela.</p>
+                      <div className="font-bold text-foreground mb-1">Arte Digital</div>
+                      <p className="text-xs text-muted-foreground">Exibe apenas a imagem (100% da tela).</p>
                     </div>
                   </div>
                 </div>
 
-                {/* 2. DADOS BÁSICOS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2"><Label>Nome do Evento</Label><Input value={eventSettings.name} onChange={(e) => setEventSettings({ ...eventSettings, name: e.target.value })} className="bg-card border-border" required /></div>
-                  <div className="space-y-2"><Label>Data e Hora</Label><Input type="datetime-local" value={eventSettings.date} onChange={(e) => setEventSettings({ ...eventSettings, date: e.target.value })} className="bg-card border-border" required /></div>
+                  <div className="space-y-2"><Label>Nome</Label><Input value={eventSettings.name} onChange={e=>setEventSettings({...eventSettings, name: e.target.value})} className="bg-card border-border" /></div>
+                  <div className="space-y-2"><Label>Data</Label><Input type="datetime-local" value={eventSettings.date} onChange={e=>setEventSettings({...eventSettings, date: e.target.value})} className="bg-card border-border" /></div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* 3. CARD WI-FI */}
                   <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Wifi size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte TV / Tablet' : 'Conexão Wi-Fi'}</h3></div>
-                    
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Wifi size={24} /></div><h3 className="text-lg font-bold">Display TV</h3></div>
                     {eventSettings.layout_mode === 'standard' ? (
                       <div className="space-y-4">
-                        <div className="space-y-1"><Label>SSID (Nome da Rede)</Label><Input value={eventSettings.wifi_ssid} onChange={(e) => setEventSettings({ ...eventSettings, wifi_ssid: e.target.value })} className="bg-secondary border-border"/></div>
-                        <div className="space-y-1"><Label>Senha da Rede</Label><Input value={eventSettings.wifi_pass} onChange={(e) => setEventSettings({ ...eventSettings, wifi_pass: e.target.value })} className="bg-secondary border-border"/></div>
+                        <div className="space-y-1"><Label>SSID</Label><Input value={eventSettings.wifi_ssid} onChange={e=>setEventSettings({...eventSettings, wifi_ssid: e.target.value})} className="bg-secondary border-border"/></div>
+                        <div className="space-y-1"><Label>Senha</Label><Input value={eventSettings.wifi_pass} onChange={e=>setEventSettings({...eventSettings, wifi_pass: e.target.value})} className="bg-secondary border-border"/></div>
                         <div className="mt-4 pt-4 border-t border-border">
                           <Label className="block mb-3">QR Code do Wi-Fi</Label>
                           <UploadBox label="Arraste o QR Code" icon="qr-code" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        <Label>Upload da Arte Horizontal (1920x1080)</Label>
-                        <UploadBox label="Arraste a Arte Pronta" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
-                        <p className="text-xs text-muted-foreground">Esta imagem vai para a rota /wifi</p>
-                      </div>
+                      <div className="space-y-4"><Label>Upload da Arte Horizontal</Label><UploadBox label="Arte Horizontal" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} /></div>
                     )}
                   </div>
 
-                  {/* 4. CARD MOMENTS */}
                   <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><ExternalLink size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte Totem Vertical' : 'Galeria Moments'}</h3></div>
-                    
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><ExternalLink size={24} /></div><h3 className="text-lg font-bold">Moments / Totem</h3></div>
                     {eventSettings.layout_mode === 'standard' ? (
                       <div className="space-y-4">
-                        <div className="space-y-1"><Label>Link da Galeria</Label><Input value={eventSettings.photo_url} onChange={(e) => setEventSettings({ ...eventSettings, photo_url: e.target.value })} className="bg-secondary border-border" placeholder="https://..." /></div>
-                        
+                        <div className="space-y-1"><Label>Link Galeria Moments</Label><Input value={eventSettings.photo_url} onChange={e=>setEventSettings({...eventSettings, photo_url: e.target.value})} className="bg-secondary border-border" placeholder="https://..." /></div>
                         <div className="mt-4 pt-4 border-t border-border">
-                          <Label className="block mb-3">Imagem do QR Code</Label>
+                          <Label className="block mb-3">QR Code</Label>
                           <div className="flex gap-2 mb-4 p-1 bg-secondary rounded-lg border border-border">
-                            <button type="button" onClick={()=>setPhotoMode('auto')} className={`flex-1 py-2 text-xs font-bold rounded transition-colors ${photoMode==='auto'?'bg-primary text-primary-foreground':'text-muted-foreground hover:text-foreground'}`}>GERAR AUTO</button>
-                            <button type="button" onClick={()=>setPhotoMode('upload')} className={`flex-1 py-2 text-xs font-bold rounded transition-colors ${photoMode==='upload'?'bg-primary text-primary-foreground':'text-muted-foreground hover:text-foreground'}`}>UPLOAD</button>
+                            <button type="button" onClick={()=>setPhotoMode('auto')} className={`flex-1 py-2 text-xs font-bold rounded ${photoMode==='auto'?'bg-primary text-primary-foreground':'text-muted-foreground'}`}>AUTO</button>
+                            <button type="button" onClick={()=>setPhotoMode('upload')} className={`flex-1 py-2 text-xs font-bold rounded ${photoMode==='upload'?'bg-primary text-primary-foreground':'text-muted-foreground'}`}>UPLOAD</button>
                           </div>
                           <div className="h-64 flex items-center justify-center bg-background border-2 border-dashed border-border rounded-xl overflow-hidden">
                             {photoMode === 'auto' ? (
                               <div className="text-center p-4">
-                                {eventSettings.photo_url ? (
-                                  <div className="bg-white p-4 rounded-xl">
-                                    {/* USANDO API PÚBLICA PARA GERAR QR E EVITAR ERRO DE BIBLIOTECA */}
-                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} alt="QR" className="w-[150px] h-[150px]" />
-                                  </div>
-                                ) : <span className="text-muted-foreground text-sm">Cole o link acima</span>}
+                                {eventSettings.photo_url ? <div className="bg-white p-4 rounded-xl"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} alt="QR" className="w-[150px] h-[150px]" /></div> : <span className="text-muted-foreground text-sm">Cole o link</span>}
                               </div>
                             ) : (
-                              <div className="w-full h-full p-2"><UploadBox label="Capa Personalizada" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
+                              <div className="w-full h-full p-2"><UploadBox label="Capa" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
                             )}
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4"><Label>Upload da Arte Vertical (1080x1920)</Label><UploadBox label="Arraste a Arte Vertical" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
+                      <div className="space-y-4"><Label>Upload da Arte Vertical</Label><UploadBox label="Arte Vertical" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
                     )}
                   </div>
                 </div>
