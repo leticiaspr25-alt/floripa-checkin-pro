@@ -226,7 +226,7 @@ export default function Auth() {
                   <Input 
                     value={accessCode} 
                     onChange={e=>setAccessCode(e.target.value)} 
-                    placeholder="Digite o código fornecido pelo gestor"
+                    placeholder="Digite o código fornecido pelo Administrador"
                     required 
                     className="bg-black border-[#f37021]/50 text-white focus:border-[#f37021]" 
                   />
