@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+// Removemos o import do QRCodeCanvas para evitar erros
 import { 
   ArrowLeft, Search, Upload, Plus, Download, Settings, 
   Printer, Users, UserCheck, Loader2, ExternalLink, Trash2,
@@ -60,7 +61,7 @@ function UploadBox({ label, icon, previewUrl, onUpload }: UploadBoxProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Cria URL temporária para preview (em produção, faria upload para bucket)
+      // Cria URL temporária para preview
       const url = URL.createObjectURL(file);
       onUpload(url);
     }
@@ -140,7 +141,6 @@ export default function EventManagement() {
   const canAccessSettings = isAdmin || isEquipe;
   const canAccessHistory = isAdmin || isEquipe;
 
-  // ... (Funções auxiliares logActivity, useEffects mantidos iguais) ...
   const logActivity = async (action: string, details: string) => {
     if (!user || !id) return;
     await supabase.from('activity_logs').insert({
@@ -180,7 +180,6 @@ export default function EventManagement() {
         wifi_img_url: data.wifi_img_url || '',
         photo_img_url: data.photo_img_url || '',
       });
-      // Se já tiver imagem de foto salva, começa no modo upload
       if (data.photo_img_url) setPhotoMode('upload');
     }
     setLoading(false);
@@ -368,7 +367,7 @@ export default function EventManagement() {
             {canAccessSettings && <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Configurações</TabsTrigger>}
           </TabsList>
 
-          {/* TAB 1: CONVIDADOS (Mantida igual, apenas resumida para caber) */}
+          {/* TAB 1: CONVIDADOS */}
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-card border border-border rounded-xl p-6">
@@ -426,7 +425,7 @@ export default function EventManagement() {
             </div>
           </TabsContent>
 
-          {/* TAB 2: HISTÓRICO (Mantida igual) */}
+          {/* TAB 2: HISTÓRICO */}
           {canAccessHistory && (
             <TabsContent value="history" className="space-y-6 animate-fade-in">
               <div className="flex items-center gap-2 mb-4"><History className="h-5 w-5 text-primary" /><h3 className="text-lg font-semibold text-foreground">Histórico</h3></div>
@@ -446,12 +445,10 @@ export default function EventManagement() {
             </TabsContent>
           )}
 
-          {/* TAB 3: CONFIGURAÇÕES (NOVA VERSÃO VISUAL) */}
+          {/* TAB 3: CONFIGURAÇÕES (VERSÃO FINAL COM CORREÇÃO DE QR CODE) */}
           {canAccessSettings && (
             <TabsContent value="settings" className="space-y-6 animate-fade-in">
               <form onSubmit={handleSaveSettings} className="space-y-8">
-                
-                {/* Dados Básicos */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label>Nome do Evento</Label>
@@ -499,14 +496,17 @@ export default function EventManagement() {
                           {photoMode === 'auto' ? (
                             <div className="text-center p-4">
                               {eventSettings.photo_url ? (
-  <div className="bg-white p-4 rounded-xl">
-    <img 
-      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} 
-      alt="QR Code Galeria" 
-      className="w-[150px] h-[150px]"
-    />
-  </div>
-) : (: <span className="text-muted-foreground text-sm">Cole o link acima para gerar o QR</span>}
+                                <div className="bg-white p-4 rounded-xl">
+                                  {/* QR Code via API para evitar dependência externa */}
+                                  <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} 
+                                    alt="QR Code" 
+                                    className="w-[150px] h-[150px]"
+                                  />
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">Cole o link acima para gerar o QR</span>
+                              )}
                               <p className="text-xs text-muted-foreground mt-3">QR gerado a partir do link</p>
                             </div>
                           ) : (
