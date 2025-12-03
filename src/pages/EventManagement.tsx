@@ -245,7 +245,7 @@ export default function EventManagement() {
           .print-label, .print-label * { visibility: visible !important; }
           .print-label { position: fixed; top: 0; left: 0; width: 90mm; height: 35mm; display: flex; flex-direction: column; justify-content: center; align-items: center; background: white; color: black; text-align: center; padding: 2mm; box-sizing: border-box; overflow: hidden; }
           .label-page-break { page-break-after: always; }
-          .guest-name { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 16pt !important; line-height: 1.1; width: 100%; white-space: normal; word-wrap: break-word; margin-bottom: 1.5mm; text-transform: uppercase; }
+          .guest-name { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 14pt !important; line-height: 1.1; width: 100%; white-space: normal; word-wrap: break-word; margin-bottom: 1.5mm; text-transform: uppercase; }
           .guest-company { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10pt !important; width: 100%; white-space: normal; overflow: hidden; text-overflow: ellipsis; color: #333; }
         }
       `}</style>
