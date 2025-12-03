@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, Search, Upload, Plus, Download, Settings, 
   Printer, Users, UserCheck, Loader2, ExternalLink, Trash2,
-  Monitor, Wifi
+  Monitor, Wifi, History, Clock
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -37,10 +37,18 @@ interface Guest {
   checkin_time: string | null;
 }
 
+interface ActivityLog {
+  id: string;
+  created_at: string;
+  user_email: string | null;
+  action: string;
+  details: string | null;
+}
+
 export default function EventManagement() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, loading: authLoading, isAdmin, isEquipe, isRecepcao } = useAuth();
+  const { user, loading: authLoading, isAdmin, isEquipe } = useAuth();
   const { toast } = useToast();
   
   const [event, setEvent] = useState<Event | null>(null);
@@ -51,6 +59,8 @@ export default function EventManagement() {
   const [newGuest, setNewGuest] = useState({ name: '', company: '', role: '' });
   const [adding, setAdding] = useState(false);
   const [printingGuest, setPrintingGuest] = useState<Guest | null>(null);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   // Settings state
   const [eventSettings, setEventSettings] = useState({
@@ -66,6 +76,19 @@ export default function EventManagement() {
   const canImportExport = isAdmin || isEquipe;
   const canDeleteGuests = isAdmin;
   const canAccessSettings = isAdmin || isEquipe;
+  const canAccessHistory = isAdmin || isEquipe;
+
+  const logActivity = async (action: string, details: string) => {
+    if (!user || !id) return;
+    
+    await supabase.from('activity_logs').insert({
+      event_id: id,
+      user_id: user.id,
+      user_email: user.email,
+      action,
+      details,
+    });
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -116,6 +139,23 @@ export default function EventManagement() {
     }
   };
 
+  const fetchActivityLogs = async () => {
+    if (!canAccessHistory) return;
+    
+    setLogsLoading(true);
+    const { data, error } = await supabase
+      .from('activity_logs')
+      .select('*')
+      .eq('event_id', id)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (!error) {
+      setActivityLogs(data || []);
+    }
+    setLogsLoading(false);
+  };
+
   const subscribeToGuests = () => {
     const channel = supabase
       .channel('guests-changes')
@@ -145,6 +185,11 @@ export default function EventManagement() {
 
     if (error) {
       toast({ title: 'Erro', description: 'Falha ao atualizar check-in.', variant: 'destructive' });
+    } else {
+      await logActivity(
+        newCheckedIn ? 'Check-in' : 'Check-out',
+        `${guest.name}${guest.company ? ` (${guest.company})` : ''}`
+      );
     }
   };
 
@@ -163,6 +208,7 @@ export default function EventManagement() {
       toast({ title: 'Erro', description: 'Falha ao adicionar convidado.', variant: 'destructive' });
     } else {
       toast({ title: 'Sucesso', description: 'Convidado adicionado!' });
+      await logActivity('Adicionou convidado', `${newGuest.name}${newGuest.company ? ` - ${newGuest.company}` : ''}`);
       setAddGuestOpen(false);
       setNewGuest({ name: '', company: '', role: '' });
     }
@@ -201,13 +247,14 @@ export default function EventManagement() {
         toast({ title: 'Erro', description: 'Falha ao importar convidados.', variant: 'destructive' });
       } else {
         toast({ title: 'Sucesso', description: `${guestsToInsert.length} convidados importados!` });
+        await logActivity('Importou convidados', `${guestsToInsert.length} convidados via Excel`);
       }
     };
     reader.readAsBinaryString(file);
     e.target.value = '';
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!canImportExport) return;
     
     const exportData = guests.map(g => ({
@@ -222,6 +269,8 @@ export default function EventManagement() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Convidados');
     XLSX.writeFile(wb, `${event?.name || 'evento'}_convidados.xlsx`);
+    
+    await logActivity('Exportou convidados', `${guests.length} convidados para Excel`);
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -245,17 +294,20 @@ export default function EventManagement() {
       toast({ title: 'Erro', description: 'Falha ao salvar configurações.', variant: 'destructive' });
     } else {
       toast({ title: 'Sucesso', description: 'Configurações salvas!' });
+      await logActivity('Atualizou configurações', 'Configurações do evento alteradas');
       fetchEvent();
     }
     setSaving(false);
   };
 
-  const handleDeleteGuest = async (guestId: string) => {
+  const handleDeleteGuest = async (guest: Guest) => {
     if (!canDeleteGuests) return;
     
-    const { error } = await supabase.from('guests').delete().eq('id', guestId);
+    const { error } = await supabase.from('guests').delete().eq('id', guest.id);
     if (error) {
       toast({ title: 'Erro', description: 'Falha ao excluir convidado.', variant: 'destructive' });
+    } else {
+      await logActivity('Excluiu convidado', `${guest.name}${guest.company ? ` (${guest.company})` : ''}`);
     }
   };
 
@@ -275,6 +327,15 @@ export default function EventManagement() {
 
   const totalGuests = guests.length;
   const checkedInGuests = guests.filter(g => g.checked_in).length;
+
+  const formatLogTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   if (authLoading || loading) {
     return (
@@ -332,11 +393,18 @@ export default function EventManagement() {
       </header>
 
       <main className="container mx-auto px-4 py-6 print:hidden">
-        <Tabs defaultValue="guests" className="space-y-6">
+        <Tabs defaultValue="guests" className="space-y-6" onValueChange={(value) => {
+          if (value === 'history') fetchActivityLogs();
+        }}>
           <TabsList className="bg-card border border-border">
             <TabsTrigger value="guests" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Convidados
             </TabsTrigger>
+            {canAccessHistory && (
+              <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Histórico
+              </TabsTrigger>
+            )}
             {canAccessSettings && (
               <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Configurações
@@ -473,7 +541,7 @@ export default function EventManagement() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteGuest(guest.id)}
+                          onClick={() => handleDeleteGuest(guest)}
                           className="text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -489,6 +557,52 @@ export default function EventManagement() {
               )}
             </div>
           </TabsContent>
+
+          {canAccessHistory && (
+            <TabsContent value="history" className="space-y-6 animate-fade-in">
+              <div className="flex items-center gap-2 mb-4">
+                <History className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold text-foreground">Histórico de Atividades</h3>
+              </div>
+
+              {logsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : activityLogs.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  Nenhuma atividade registrada.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {activityLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="bg-card border border-border rounded-lg p-4 flex items-start gap-4"
+                    >
+                      <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+                        <Clock className="h-4 w-4" />
+                        <span className="text-sm font-mono">{formatLogTime(log.created_at)}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="border-primary text-primary">
+                            {log.action}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground truncate">
+                            {log.user_email}
+                          </span>
+                        </div>
+                        {log.details && (
+                          <p className="text-sm text-foreground mt-1">{log.details}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          )}
 
           {canAccessSettings && (
             <TabsContent value="settings" className="space-y-6 animate-fade-in">
