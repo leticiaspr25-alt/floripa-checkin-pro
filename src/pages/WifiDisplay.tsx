@@ -71,7 +71,6 @@ export default function WifiDisplay() {
         {/* Bloco Fotos */}
         <div className="flex flex-col items-center">
           <div className="bg-white p-4 rounded-3xl mb-8 transform scale-110 shadow-[0_0_20px_rgba(243,112,33,0.3)]">
-             {/* Usando API de QR Code para evitar erro de biblioteca */}
              <img 
                src={`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(event.photo_url || '#')}`} 
                className="w-64 h-64" 
