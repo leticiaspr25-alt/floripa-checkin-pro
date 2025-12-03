@@ -354,6 +354,22 @@ export default function EventManagement() {
     reader.readAsBinaryString(file);
     e.target.value = '';
   };
+  // --- FUNÇÃO QUE ESTAVA FALTANDO: EXPORTAR EXCEL ---
+  const handleExportExcel = async () => {
+    if (!canImportExport) return;
+    
+    const exportData = guests.map(g => ({
+      Nome: g.name, 
+      Empresa: g.company || '', 
+      Cargo: g.role || '',
+      'Check-in': g.checked_in ? 'Sim' : 'Não',
+      'Hora Check-in': g.checkin_time ? new Date(g.checkin_time).toLocaleString('pt-BR') : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Convidados');
+    XLSX.writeFile(wb, `${event?.name || 'evento'}_conv
 
   // --- SALVAR CONFIGURAÇÕES ---
   const handleSaveSettings = async (e: React.FormEvent) => {
