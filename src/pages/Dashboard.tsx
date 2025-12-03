@@ -6,10 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Calendar, LogOut, Loader2 } from 'lucide-react';
+import { Plus, Calendar, LogOut, Loader2, Users, KeyRound, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
+import UserManagement from '@/components/admin/UserManagement';
+import AccessCodeManagement from '@/components/admin/AccessCodeManagement';
 
 interface Event {
   id: string;
@@ -19,7 +23,7 @@ interface Event {
 }
 
 export default function Dashboard() {
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user, signOut, loading: authLoading, role, isAdmin, isRecepcao } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
@@ -84,6 +88,25 @@ export default function Dashboard() {
     navigate('/auth');
   };
 
+  const getRoleBadge = () => {
+    if (!role) return null;
+    const colors = {
+      admin: 'bg-primary/20 text-primary border-primary/30',
+      equipe: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      recepcao: 'bg-green-500/20 text-green-400 border-green-500/30',
+    };
+    const labels = {
+      admin: 'Admin',
+      equipe: 'Equipe',
+      recepcao: 'Recepção',
+    };
+    return (
+      <Badge className={`${colors[role]} border`}>
+        {labels[role]}
+      </Badge>
+    );
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -99,6 +122,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-primary" />
             <span className="font-semibold text-lg text-foreground">Floripa Square</span>
+            {getRoleBadge()}
           </div>
           <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
             <LogOut className="h-4 w-4 mr-2" />
@@ -108,8 +132,103 @@ export default function Dashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Eventos</h1>
+        {isAdmin ? (
+          <Tabs defaultValue="events" className="space-y-6">
+            <TabsList className="bg-surface border border-border">
+              <TabsTrigger value="events" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Calendar className="h-4 w-4 mr-2" />
+                Eventos
+              </TabsTrigger>
+              <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Users className="h-4 w-4 mr-2" />
+                Gerenciar Equipe
+              </TabsTrigger>
+              <TabsTrigger value="access" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <KeyRound className="h-4 w-4 mr-2" />
+                Chaves de Acesso
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="events">
+              <EventsSection 
+                events={events}
+                createDialogOpen={createDialogOpen}
+                setCreateDialogOpen={setCreateDialogOpen}
+                newEventName={newEventName}
+                setNewEventName={setNewEventName}
+                newEventDate={newEventDate}
+                setNewEventDate={setNewEventDate}
+                handleCreateEvent={handleCreateEvent}
+                creating={creating}
+                navigate={navigate}
+                canCreate={!isRecepcao}
+              />
+            </TabsContent>
+
+            <TabsContent value="users">
+              <div className="bg-card border border-border rounded-xl p-6">
+                <UserManagement />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="access">
+              <div className="bg-card border border-border rounded-xl p-6">
+                <AccessCodeManagement />
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <EventsSection 
+            events={events}
+            createDialogOpen={createDialogOpen}
+            setCreateDialogOpen={setCreateDialogOpen}
+            newEventName={newEventName}
+            setNewEventName={setNewEventName}
+            newEventDate={newEventDate}
+            setNewEventDate={setNewEventDate}
+            handleCreateEvent={handleCreateEvent}
+            creating={creating}
+            navigate={navigate}
+            canCreate={!isRecepcao}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+interface EventsSectionProps {
+  events: Event[];
+  createDialogOpen: boolean;
+  setCreateDialogOpen: (open: boolean) => void;
+  newEventName: string;
+  setNewEventName: (name: string) => void;
+  newEventDate: string;
+  setNewEventDate: (date: string) => void;
+  handleCreateEvent: (e: React.FormEvent) => void;
+  creating: boolean;
+  navigate: (path: string) => void;
+  canCreate: boolean;
+}
+
+function EventsSection({
+  events,
+  createDialogOpen,
+  setCreateDialogOpen,
+  newEventName,
+  setNewEventName,
+  newEventDate,
+  setNewEventDate,
+  handleCreateEvent,
+  creating,
+  navigate,
+  canCreate
+}: EventsSectionProps) {
+  return (
+    <>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold text-foreground">Eventos</h1>
+        {canCreate && (
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground glow-primary">
@@ -150,37 +269,39 @@ export default function Dashboard() {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-
-        {events.length === 0 ? (
-          <div className="text-center py-16 animate-fade-in">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-              <Calendar className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium text-foreground mb-2">Nenhum evento ainda</h3>
-            <p className="text-muted-foreground">Crie seu primeiro evento para começar.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {events.map((event, index) => (
-              <div
-                key={event.id}
-                onClick={() => navigate(`/event/${event.id}`)}
-                className="bg-card hover:bg-surface-hover border border-border rounded-xl p-6 cursor-pointer transition-all duration-200 hover:border-primary/50 animate-fade-in"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <h3 className="text-lg font-semibold text-foreground mb-2 line-clamp-2">{event.name}</h3>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span className="text-sm">
-                    {format(new Date(event.date), "dd 'de' MMMM, yyyy 'às' HH:mm", { locale: ptBR })}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
         )}
-      </main>
-    </div>
+      </div>
+
+      {events.length === 0 ? (
+        <div className="text-center py-16 animate-fade-in">
+          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+            <Calendar className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium text-foreground mb-2">Nenhum evento ainda</h3>
+          <p className="text-muted-foreground">
+            {canCreate ? 'Crie seu primeiro evento para começar.' : 'Aguarde a criação de eventos.'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {events.map((event, index) => (
+            <div
+              key={event.id}
+              onClick={() => navigate(`/event/${event.id}`)}
+              className="bg-card hover:bg-surface-hover border border-border rounded-xl p-6 cursor-pointer transition-all duration-200 hover:border-primary/50 animate-fade-in"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <h3 className="text-lg font-semibold text-foreground mb-2 line-clamp-2">{event.name}</h3>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span className="text-sm">
+                  {format(new Date(event.date), "dd 'de' MMMM, yyyy 'às' HH:mm", { locale: ptBR })}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
