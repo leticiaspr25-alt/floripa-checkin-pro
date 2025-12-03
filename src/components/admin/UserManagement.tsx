@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Trash2, KeyRound, User, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/hooks/useAuth';
 
 interface UserWithRole {
   user_id: string;
@@ -18,6 +19,7 @@ interface UserWithRole {
 
 export default function UserManagement() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
@@ -173,15 +175,19 @@ export default function UserManagement() {
                   <KeyRound className="h-4 w-4 mr-1" />
                   Resetar Senha
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDeleteUser(user.user_id)}
-                  disabled={actionLoading}
-                  className="text-destructive hover:bg-destructive/10"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {user.user_id !== currentUser?.id ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteUser(user.user_id)}
+                    disabled={actionLoading}
+                    className="text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground px-2">Você</span>
+                )}
               </div>
             </div>
           ))}

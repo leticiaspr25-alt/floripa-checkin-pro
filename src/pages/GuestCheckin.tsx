@@ -114,7 +114,7 @@ export default function GuestCheckin() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-6">
             <CheckCircle className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Bem-vindo(a)!</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Obrigado por comparecer!</h1>
           <p className="text-2xl text-primary font-semibold mb-8">{guestName}</p>
 
           {event.wifi_ssid && (
@@ -143,11 +143,11 @@ export default function GuestCheckin() {
 
           {event.photo_url && (
             <Button
-              className="w-full bg-primary hover:bg-primary/90 h-14 text-lg"
+              className="w-full bg-primary hover:bg-primary/90 h-16 text-xl font-bold uppercase tracking-wide"
               onClick={() => window.open(event.photo_url!, '_blank')}
             >
-              <Camera className="h-5 w-5 mr-2" />
-              Ver Fotos do Evento
+              <Camera className="h-6 w-6 mr-3" />
+              ACESSAR FOTOS NO MOMENTS
             </Button>
           )}
         </div>
