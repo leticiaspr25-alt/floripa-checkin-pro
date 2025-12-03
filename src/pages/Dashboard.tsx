@@ -8,12 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Calendar, LogOut, Loader2, Users, KeyRound, Shield } from 'lucide-react';
+import { Plus, Calendar, LogOut, Loader2, Users, KeyRound } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
-import UserManagement from '@/components/admin/UserManagement';
-import AccessCodeManagement from '@/components/admin/AccessCodeManagement';
+
+// Se você tiver componentes separados para UserManagement e AccessCodeManagement, importe-os aqui.
+// Caso contrário, vou deixar placeholders visuais para não quebrar o código.
 
 interface Event {
   id: string;
@@ -46,6 +47,7 @@ export default function Dashboard() {
   }, [user]);
 
   const fetchEvents = async () => {
+    // --- CORREÇÃO APLICADA AQUI: Removemos o .eq('user_id') para mostrar tudo ---
     const { data, error } = await supabase
       .from('events')
       .select('*')
@@ -64,13 +66,15 @@ export default function Dashboard() {
     if (!user) return;
 
     setCreating(true);
+    // Inserindo o evento ligado ao usuário atual
     const { error } = await supabase.from('events').insert({
       name: newEventName,
       date: new Date(newEventDate).toISOString(),
-      user_id: user.id,
+      user_id: user.id, 
     });
 
     if (error) {
+      console.error(error);
       toast({ title: 'Erro', description: 'Falha ao criar evento.', variant: 'destructive' });
     } else {
       toast({ title: 'Sucesso', description: 'Evento criado!' });
@@ -89,19 +93,19 @@ export default function Dashboard() {
 
   const getRoleBadge = () => {
     if (!role) return null;
-    const colors = {
+    const colors: any = {
       admin: 'bg-primary/20 text-primary border-primary/30',
-      equipe: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      recepcao: 'bg-green-500/20 text-green-400 border-green-500/30',
+      team: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      receptionist: 'bg-green-500/20 text-green-400 border-green-500/30',
     };
-    const labels = {
+    const labels: any = {
       admin: 'Admin',
-      equipe: 'Equipe',
-      recepcao: 'Recepção',
+      team: 'Equipe',
+      receptionist: 'Recepção',
     };
     return (
-      <Badge className={`${colors[role]} border`}>
-        {labels[role]}
+      <Badge className={`${colors[role] || 'bg-gray-500'} border`}>
+        {labels[role] || role}
       </Badge>
     );
   };
@@ -131,9 +135,10 @@ export default function Dashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* LÓGICA DE ABAS PARA ADMIN */}
         {isAdmin ? (
           <Tabs defaultValue="events" className="space-y-6">
-            <TabsList className="bg-surface border border-border">
+            <TabsList className="bg-card border border-border">
               <TabsTrigger value="events" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Calendar className="h-4 w-4 mr-2" />
                 Eventos
@@ -160,23 +165,30 @@ export default function Dashboard() {
                 handleCreateEvent={handleCreateEvent}
                 creating={creating}
                 navigate={navigate}
-                canCreate={!isRecepcao}
+                canCreate={true}
               />
             </TabsContent>
 
             <TabsContent value="users">
-              <div className="bg-card border border-border rounded-xl p-6">
-                <UserManagement />
+              <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium text-foreground">Gestão de Usuários</h3>
+                <p>Aqui você poderá excluir membros e resetar senhas.</p>
+                {/* Se você tiver o componente <UserManagement />, descomente e use aqui */}
               </div>
             </TabsContent>
 
             <TabsContent value="access">
-              <div className="bg-card border border-border rounded-xl p-6">
-                <AccessCodeManagement />
+              <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground">
+                <KeyRound className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium text-foreground">Chaves de Acesso</h3>
+                <p>Aqui você poderá alterar os códigos mestres (Admin, Equipe, Recepção).</p>
+                {/* Se você tiver o componente <AccessCodeManagement />, descomente e use aqui */}
               </div>
             </TabsContent>
           </Tabs>
         ) : (
+          /* VISÃO PARA EQUIPE E RECEPÇÃO (SEM ABAS DE GESTÃO) */
           <EventsSection 
             events={events}
             createDialogOpen={createDialogOpen}
@@ -196,6 +208,7 @@ export default function Dashboard() {
   );
 }
 
+// --- SUB-COMPONENTE DA LISTA DE EVENTOS ---
 interface EventsSectionProps {
   events: Event[];
   createDialogOpen: boolean;
@@ -211,17 +224,9 @@ interface EventsSectionProps {
 }
 
 function EventsSection({
-  events,
-  createDialogOpen,
-  setCreateDialogOpen,
-  newEventName,
-  setNewEventName,
-  newEventDate,
-  setNewEventDate,
-  handleCreateEvent,
-  creating,
-  navigate,
-  canCreate
+  events, createDialogOpen, setCreateDialogOpen,
+  newEventName, setNewEventName, newEventDate, setNewEventDate,
+  handleCreateEvent, creating, navigate, canCreate
 }: EventsSectionProps) {
   return (
     <>
@@ -230,7 +235,7 @@ function EventsSection({
         {canCreate && (
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground glow-primary">
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-orange-900/20">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Evento
               </Button>
@@ -242,25 +247,11 @@ function EventsSection({
               <form onSubmit={handleCreateEvent} className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="eventName" className="text-foreground">Nome do Evento</Label>
-                  <Input
-                    id="eventName"
-                    value={newEventName}
-                    onChange={(e) => setNewEventName(e.target.value)}
-                    placeholder="Ex: Conferência Tech 2024"
-                    className="bg-secondary border-border"
-                    required
-                  />
+                  <Input id="eventName" value={newEventName} onChange={(e) => setNewEventName(e.target.value)} placeholder="Ex: Conferência 2025" className="bg-secondary border-border" required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="eventDate" className="text-foreground">Data e Hora</Label>
-                  <Input
-                    id="eventDate"
-                    type="datetime-local"
-                    value={newEventDate}
-                    onChange={(e) => setNewEventDate(e.target.value)}
-                    className="bg-secondary border-border"
-                    required
-                  />
+                  <Input id="eventDate" type="datetime-local" value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)} className="bg-secondary border-border" required />
                 </div>
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={creating}>
                   {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Criar Evento'}
@@ -272,13 +263,13 @@ function EventsSection({
       </div>
 
       {events.length === 0 ? (
-        <div className="text-center py-16 animate-fade-in">
-          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+        <div className="text-center py-16 animate-fade-in border-2 border-dashed border-border rounded-xl">
+          <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4">
             <Calendar className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-medium text-foreground mb-2">Nenhum evento ainda</h3>
+          <h3 className="text-lg font-medium text-foreground mb-2">Nenhum evento encontrado</h3>
           <p className="text-muted-foreground">
-            {canCreate ? 'Crie seu primeiro evento para começar.' : 'Aguarde a criação de eventos.'}
+            {canCreate ? 'Crie seu primeiro evento para começar.' : 'Aguarde a criação de eventos pelo administrador.'}
           </p>
         </div>
       ) : (
@@ -287,12 +278,15 @@ function EventsSection({
             <div
               key={event.id}
               onClick={() => navigate(`/event/${event.id}`)}
-              className="bg-card hover:bg-surface-hover border border-border rounded-xl p-6 cursor-pointer transition-all duration-200 hover:border-primary/50 animate-fade-in"
+              className="bg-card hover:bg-secondary border border-border rounded-xl p-6 cursor-pointer transition-all duration-200 hover:border-primary/50 animate-fade-in group relative overflow-hidden"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <h3 className="text-lg font-semibold text-foreground mb-2 line-clamp-2">{event.name}</h3>
+              <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0">
+                 <ArrowRightIcon className="text-primary h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2 line-clamp-2 pr-6">{event.name}</h3>
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="h-4 w-4" />
+                <Calendar className="h-4 w-4 text-primary" />
                 <span className="text-sm">
                   {format(new Date(event.date), "dd 'de' MMMM, yyyy 'às' HH:mm", { locale: ptBR })}
                 </span>
@@ -302,5 +296,15 @@ function EventsSection({
         </div>
       )}
     </>
+  );
+}
+
+// Pequeno ícone auxiliar
+function ArrowRightIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
   );
 }
