@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Eye, EyeOff } from 'lucide-react'; // Importamos os ícones do olho
+import { Loader2, Eye, EyeOff } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
@@ -49,23 +49,24 @@ export default function Auth() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validação de Senhas Iguais
     if (newPassword !== confirmPassword) {
-      toast({ title: "Erro", description: "As senhas não coincidem.", variant: "destructive" });
+      toast({ title: "Erro", description: "As senhas não conferem.", variant: "destructive" });
       return;
     }
 
-    // --- VALIDAÇÃO DAS CHAVES ---
-    // Nota: Em produção real, o ideal é validar isso no Backend (Edge Function),
-    // mas para este MVP, validamos aqui e salvamos o role no metadata.
-    
-    // Buscamos a chave no banco de dados (simulação via código fixo ou busca)
-    // Aqui mantemos a lógica simples de comparação direta para garantir funcionamento imediato
+    // Validação do Código de Acesso
+    // (Em produção, idealmente buscaria do banco, mas aqui mantemos fixo para garantir funcionamento)
     let role = '';
     if (accessCode === 'MASTER_FLORIPA') role = 'admin';
     else if (accessCode === 'EQUIPE_2025') role = 'team';
     else if (accessCode === 'RECEPCAO_EVENTO') role = 'receptionist';
     else {
-      toast({ title: "Acesso Negado", description: "O código de acesso informado é inválido.", variant: "destructive" });
+      // Verifica se o código bate com alguma chave personalizada do banco (Opcional, mas boa prática)
+      // Como não temos essa busca síncrona aqui, vamos confiar nos códigos padrão por enquanto.
+      // Se você quiser que ele valide códigos novos do banco, teríamos que fazer uma query antes.
+      // Mas para o Admin (você) entrar agora, o MASTER_FLORIPA vai funcionar.
+      toast({ title: "Acesso Negado", description: "Código de acesso inválido.", variant: "destructive" });
       return;
     }
 
@@ -77,7 +78,7 @@ export default function Auth() {
       options: {
         data: {
           full_name: newName,
-          role: role, // Salva o cargo no perfil do usuário
+          role: role,
         },
       },
     });
@@ -85,11 +86,10 @@ export default function Auth() {
     if (error) {
       toast({ title: "Erro no Cadastro", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Sucesso!", description: "Conta criada com sucesso! Entrando..." });
+      toast({ title: "Sucesso!", description: "Conta criada. Entrando..." });
       if (data.session) {
         navigate('/dashboard');
       } else {
-        // Fallback: Tenta logar manualmente se a sessão não vier automática
         const { error: loginError } = await supabase.auth.signInWithPassword({ email: newEmail, password: newPassword });
         if (!loginError) navigate('/dashboard');
       }
@@ -101,7 +101,7 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-black p-4">
       <Card className="w-full max-w-md bg-[#1A1A1A] border-[#333] text-white">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center text-[#f37021]">Rooftop Event Manager</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center text-[#f37021]">Floripa Event Manager</CardTitle>
           <CardDescription className="text-center text-gray-400">Acesse o sistema para gerenciar</CardDescription>
         </CardHeader>
         <CardContent>
@@ -111,36 +111,18 @@ export default function Auth() {
               <TabsTrigger value="signup" className="data-[state=active]:bg-[#f37021] data-[state=active]:text-white">Criar Conta</TabsTrigger>
             </TabsList>
             
-            {/* --- FORMULÁRIO DE LOGIN --- */}
+            {/* LOGIN */}
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input 
-                    type="email" 
-                    value={email} 
-                    onChange={e=>setEmail(e.target.value)} 
-                    required 
-                    className="bg-black border-[#333] text-white focus:border-[#f37021]" 
-                  />
+                  <Input type="email" value={email} onChange={e=>setEmail(e.target.value)} required className="bg-black border-[#333] text-white focus:border-[#f37021]" />
                 </div>
                 <div className="space-y-2">
                   <Label>Senha</Label>
                   <div className="relative">
-                    <Input 
-                      type={showPassword ? "text" : "password"} 
-                      value={password} 
-                      onChange={e=>setPassword(e.target.value)} 
-                      required 
-                      className="bg-black border-[#333] text-white focus:border-[#f37021] pr-10" 
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-white"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
+                    <Input type={showPassword ? "text" : "password"} value={password} onChange={e=>setPassword(e.target.value)} required className="bg-black border-[#333] text-white focus:border-[#f37021] pr-10" />
+                    <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
@@ -151,62 +133,41 @@ export default function Auth() {
               </form>
             </TabsContent>
 
-            {/* --- FORMULÁRIO DE CADASTRO --- */}
+            {/* CADASTRO */}
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Nome Completo</Label>
-                  <Input 
-                    value={newName} 
-                    onChange={e=>setNewName(e.target.value)} 
-                    required 
-                    className="bg-black border-[#333] text-white focus:border-[#f37021]" 
-                  />
+                  <Input value={newName} onChange={e=>setNewName(e.target.value)} required className="bg-black border-[#333] text-white focus:border-[#f37021]" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input 
-                    type="email" 
-                    value={newEmail} 
-                    onChange={e=>setNewEmail(e.target.value)} 
-                    required 
-                    className="bg-black border-[#333] text-white focus:border-[#f37021]" 
-                  />
+                  <Label>Email Corporativo</Label>
+                  <Input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} required className="bg-black border-[#333] text-white focus:border-[#f37021]" />
                 </div>
                 
-                {/* Senha com Olhinho */}
                 <div className="space-y-2">
                   <Label>Senha</Label>
                   <div className="relative">
-                    <Input 
-                      type={showPassword ? "text" : "password"} 
-                      value={newPassword} 
-                      onChange={e=>setNewPassword(e.target.value)} 
-                      required 
-                      className="bg-black border-[#333] text-white focus:border-[#f37021] pr-10" 
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-white"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
+                    <Input type={showPassword ? "text" : "password"} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required className="bg-black border-[#333] text-white focus:border-[#f37021] pr-10" />
+                    <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Confirmar Senha</Label>
+                  <div className="relative">
+                    <Input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required className="bg-black border-[#333] text-white focus:border-[#f37021] pr-10" />
+                    <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-white" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
                 
-                {/* Código de Acesso (SEM PLACEHOLDER REVELADOR) */}
                 <div className="space-y-2 pt-2 border-t border-[#333] mt-2">
                   <Label className="text-[#f37021] font-bold">Código de Acesso</Label>
-                  <Input 
-                    value={accessCode} 
-                    onChange={e=>setAccessCode(e.target.value)} 
-                    placeholder="Digite o Código Fornecido pelo Administrador"
-                    required 
-                    className="bg-black border-[#f37021]/50 text-white focus:border-[#f37021]" 
-                  />
+                  <Input value={accessCode} onChange={e=>setAccessCode(e.target.value)} placeholder="Digite o código" required className="bg-black border-[#f37021]/50 text-white focus:border-[#f37021]" />
                   <p className="text-[10px] text-gray-500">Este código define seu nível de permissão.</p>
                 </div>
 
