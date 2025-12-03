@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, Search, Upload, Plus, Download, Settings, 
-  Printer, Users, UserCheck, Loader2, ExternalLink, Trash2 
+  Printer, Users, UserCheck, Loader2, ExternalLink, Trash2,
+  Monitor, Wifi
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -39,7 +40,7 @@ interface Guest {
 export default function EventManagement() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isAdmin, isEquipe, isRecepcao } = useAuth();
   const { toast } = useToast();
   
   const [event, setEvent] = useState<Event | null>(null);
@@ -60,6 +61,11 @@ export default function EventManagement() {
     photo_url: '',
   });
   const [saving, setSaving] = useState(false);
+
+  // Role-based permissions
+  const canImportExport = isAdmin || isEquipe;
+  const canDeleteGuests = isAdmin;
+  const canAccessSettings = isAdmin || isEquipe;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -164,6 +170,8 @@ export default function EventManagement() {
   };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canImportExport) return;
+    
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -200,6 +208,8 @@ export default function EventManagement() {
   };
 
   const handleExportExcel = () => {
+    if (!canImportExport) return;
+    
     const exportData = guests.map(g => ({
       Nome: g.name,
       Empresa: g.company || '',
@@ -216,6 +226,8 @@ export default function EventManagement() {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAccessSettings) return;
+    
     setSaving(true);
 
     const { error } = await supabase
@@ -239,6 +251,8 @@ export default function EventManagement() {
   };
 
   const handleDeleteGuest = async (guestId: string) => {
+    if (!canDeleteGuests) return;
+    
     const { error } = await supabase.from('guests').delete().eq('id', guestId);
     if (error) {
       toast({ title: 'Erro', description: 'Falha ao excluir convidado.', variant: 'destructive' });
@@ -287,11 +301,33 @@ export default function EventManagement() {
       )}
 
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
-        <div className="container mx-auto px-4 h-16 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold text-foreground truncate">{event?.name}</h1>
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-lg font-semibold text-foreground truncate">{event?.name}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-border"
+              onClick={() => window.open(`/totem/${id}`, '_blank')}
+            >
+              <Monitor className="h-4 w-4 mr-2" />
+              Abrir Totem
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-border"
+              onClick={() => window.open(`/wifi/${id}`, '_blank')}
+            >
+              <Wifi className="h-4 w-4 mr-2" />
+              Display TV
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -301,9 +337,11 @@ export default function EventManagement() {
             <TabsTrigger value="guests" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Convidados
             </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              Configurações
-            </TabsTrigger>
+            {canAccessSettings && (
+              <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Configurações
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
@@ -337,12 +375,14 @@ export default function EventManagement() {
                 />
               </div>
               
-              <label className="cursor-pointer">
-                <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
-                <Button variant="outline" className="border-border" asChild>
-                  <span><Upload className="h-4 w-4 mr-2" />Importar</span>
-                </Button>
-              </label>
+              {canImportExport && (
+                <label className="cursor-pointer">
+                  <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
+                  <Button variant="outline" className="border-border" asChild>
+                    <span><Upload className="h-4 w-4 mr-2" />Importar</span>
+                  </Button>
+                </label>
+              )}
 
               <Dialog open={addGuestOpen} onOpenChange={setAddGuestOpen}>
                 <DialogTrigger asChild>
@@ -387,9 +427,11 @@ export default function EventManagement() {
                 </DialogContent>
               </Dialog>
 
-              <Button variant="outline" className="border-border" onClick={handleExportExcel}>
-                <Download className="h-4 w-4 mr-2" />Exportar
-              </Button>
+              {canImportExport && (
+                <Button variant="outline" className="border-border" onClick={handleExportExcel}>
+                  <Download className="h-4 w-4 mr-2" />Exportar
+                </Button>
+              )}
             </div>
 
             {/* Guest List */}
@@ -427,14 +469,16 @@ export default function EventManagement() {
                       >
                         <Printer className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteGuest(guest.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canDeleteGuests && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteGuest(guest.id)}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Switch
                         checked={guest.checked_in}
                         onCheckedChange={() => handleToggleCheckIn(guest)}
@@ -446,101 +490,103 @@ export default function EventManagement() {
             </div>
           </TabsContent>
 
-          <TabsContent value="settings" className="space-y-6 animate-fade-in">
-            <form onSubmit={handleSaveSettings} className="space-y-6 max-w-xl">
-              <div className="space-y-2">
-                <Label className="text-foreground">Nome do Evento</Label>
-                <Input
-                  value={eventSettings.name}
-                  onChange={(e) => setEventSettings({ ...eventSettings, name: e.target.value })}
-                  className="bg-card border-border"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-foreground">Data e Hora</Label>
-                <Input
-                  type="datetime-local"
-                  value={eventSettings.date}
-                  onChange={(e) => setEventSettings({ ...eventSettings, date: e.target.value })}
-                  className="bg-card border-border"
-                  required
-                />
-              </div>
-              
-              <div className="pt-4 border-t border-border">
-                <h3 className="font-semibold text-foreground mb-4">Wi-Fi do Evento</h3>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-foreground">Nome da Rede (SSID)</Label>
-                    <Input
-                      value={eventSettings.wifi_ssid}
-                      onChange={(e) => setEventSettings({ ...eventSettings, wifi_ssid: e.target.value })}
-                      className="bg-card border-border"
-                      placeholder="Ex: EventoWiFi"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-foreground">Senha</Label>
-                    <Input
-                      value={eventSettings.wifi_pass}
-                      onChange={(e) => setEventSettings({ ...eventSettings, wifi_pass: e.target.value })}
-                      className="bg-card border-border"
-                      placeholder="Ex: senha123"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-border">
-                <h3 className="font-semibold text-foreground mb-4">Galeria de Fotos</h3>
+          {canAccessSettings && (
+            <TabsContent value="settings" className="space-y-6 animate-fade-in">
+              <form onSubmit={handleSaveSettings} className="space-y-6 max-w-xl">
                 <div className="space-y-2">
-                  <Label className="text-foreground">Link da Galeria</Label>
+                  <Label className="text-foreground">Nome do Evento</Label>
                   <Input
-                    value={eventSettings.photo_url}
-                    onChange={(e) => setEventSettings({ ...eventSettings, photo_url: e.target.value })}
+                    value={eventSettings.name}
+                    onChange={(e) => setEventSettings({ ...eventSettings, name: e.target.value })}
                     className="bg-card border-border"
-                    placeholder="https://..."
+                    required
                   />
                 </div>
-              </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Data e Hora</Label>
+                  <Input
+                    type="datetime-local"
+                    value={eventSettings.date}
+                    onChange={(e) => setEventSettings({ ...eventSettings, date: e.target.value })}
+                    className="bg-card border-border"
+                    required
+                  />
+                </div>
+                
+                <div className="pt-4 border-t border-border">
+                  <h3 className="font-semibold text-foreground mb-4">Wi-Fi do Evento</h3>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Nome da Rede (SSID)</Label>
+                      <Input
+                        value={eventSettings.wifi_ssid}
+                        onChange={(e) => setEventSettings({ ...eventSettings, wifi_ssid: e.target.value })}
+                        className="bg-card border-border"
+                        placeholder="Ex: EventoWiFi"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Senha</Label>
+                      <Input
+                        value={eventSettings.wifi_pass}
+                        onChange={(e) => setEventSettings({ ...eventSettings, wifi_pass: e.target.value })}
+                        className="bg-card border-border"
+                        placeholder="Ex: senha123"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-              <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Settings className="h-4 w-4 mr-2" />}
-                Salvar Configurações
-              </Button>
-            </form>
+                <div className="pt-4 border-t border-border">
+                  <h3 className="font-semibold text-foreground mb-4">Galeria de Fotos</h3>
+                  <div className="space-y-2">
+                    <Label className="text-foreground">Link da Galeria</Label>
+                    <Input
+                      value={eventSettings.photo_url}
+                      onChange={(e) => setEventSettings({ ...eventSettings, photo_url: e.target.value })}
+                      className="bg-card border-border"
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
 
-            <div className="pt-6 border-t border-border">
-              <h3 className="font-semibold text-foreground mb-4">Telas Públicas</h3>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="outline"
-                  className="border-border"
-                  onClick={() => window.open(`/totem/${id}`, '_blank')}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Abrir Totem
+                <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Settings className="h-4 w-4 mr-2" />}
+                  Salvar Configurações
                 </Button>
-                <Button
-                  variant="outline"
-                  className="border-border"
-                  onClick={() => window.open(`/wifi/${id}`, '_blank')}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Abrir Display Wi-Fi
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-border"
-                  onClick={() => window.open(`/guest/${id}`, '_blank')}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Abrir Check-in Mobile
-                </Button>
+              </form>
+
+              <div className="pt-6 border-t border-border">
+                <h3 className="font-semibold text-foreground mb-4">Telas Públicas</h3>
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    variant="outline"
+                    className="border-border"
+                    onClick={() => window.open(`/totem/${id}`, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Abrir Totem
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-border"
+                    onClick={() => window.open(`/wifi/${id}`, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Abrir Display Wi-Fi
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-border"
+                    onClick={() => window.open(`/guest/${id}`, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Abrir Check-in Mobile
+                  </Button>
+                </div>
               </div>
-            </div>
-          </TabsContent>
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>
