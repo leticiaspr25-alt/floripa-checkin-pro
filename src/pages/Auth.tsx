@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client'; // Falando direto com o chefe
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   
@@ -29,13 +28,19 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      await signIn(email, password);
-      navigate('/dashboard');
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
+    
+    // Login direto no Supabase
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      toast({ title: "Erro no Login", description: error.message, variant: "destructive" });
       setLoading(false);
+    } else {
+      // Sucesso! Vai pro Dashboard
+      navigate('/dashboard');
     }
   };
 
@@ -47,27 +52,45 @@ export default function Auth() {
       return;
     }
 
-    // --- VALIDAÇÃO DAS CHAVES (CODIGOS FIXOS) ---
+    // --- VALIDAÇÃO DAS CHAVES ---
     let role = '';
     if (accessCode === 'MASTER_FLORIPA') role = 'admin';
     else if (accessCode === 'EQUIPE_2025') role = 'team';
     else if (accessCode === 'RECEPCAO_EVENTO') role = 'receptionist';
     else {
-      toast({ title: "Erro", description: "Código de acesso inválido. Verifique com o administrador.", variant: "destructive" });
+      toast({ title: "Código Inválido", description: "Verifique o código de acesso.", variant: "destructive" });
       return;
     }
 
     setLoading(true);
-    try {
-      // Passamos o cargo (role) e o nome junto com o cadastro
-      await signUp(newEmail, newPassword, { full_name: newName, role: role });
-      toast({ title: "Sucesso!", description: "Conta criada. Verifique seu e-mail (se necessário) ou faça login." });
-      // Opcional: Já logar direto ou pedir login
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
+
+    // Cadastro direto no Supabase
+    const { data, error } = await supabase.auth.signUp({
+      email: newEmail,
+      password: newPassword,
+      options: {
+        data: {
+          full_name: newName,
+          role: role,
+        },
+      },
+    });
+
+    if (error) {
+      toast({ title: "Erro no Cadastro", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Sucesso!", description: "Conta criada. Entrando..." });
+      // Se a confirmação de email estiver desligada, ele já loga.
+      // Se estiver ligada, ele avisa.
+      if (data.session) {
+        navigate('/dashboard');
+      } else {
+        // Fallback: Tenta logar manualmente se não veio a sessão
+        const { error: loginError } = await supabase.auth.signInWithPassword({ email: newEmail, password: newPassword });
+        if (!loginError) navigate('/dashboard');
+      }
     }
+    setLoading(false);
   };
 
   return (
@@ -105,7 +128,7 @@ export default function Auth() {
                   <Input 
                     value={accessCode} 
                     onChange={e=>setAccessCode(e.target.value)} 
-                    placeholder="Solicite ao administrador"
+                    placeholder="MASTER_FLORIPA"
                     required 
                     className="bg-black border-[#f37021]/50 text-white" 
                   />
