@@ -1,143 +1,122 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, Eye, EyeOff, User, KeyRound } from 'lucide-react';
+
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
+  const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  
+  // Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Signup State
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [accessCode, setAccessCode] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const {
-    signIn,
-    signUp,
-    user
-  } = useAuth();
-  const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
-  useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    }
-  }, [user, navigate]);
-  const handleSubmit = async (e: React.FormEvent) => {
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    if (!isLogin && password !== confirmPassword) {
-      toast({
-        title: 'Erro',
-        description: 'As senhas não coincidem.',
-        variant: 'destructive'
-      });
+    try {
+      await signIn(email, password);
+      navigate('/dashboard');
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Erro", description: "Senhas não conferem.", variant: "destructive" });
       return;
     }
-    const {
-      error
-    } = isLogin ? await signIn(email, password) : await signUp(email, password, displayName, accessCode);
-    if (error) {
-      let message = error.message;
-      if (error.message.includes('Invalid login credentials')) {
-        message = 'Email ou senha incorretos.';
-      } else if (error.message.includes('User already registered')) {
-        message = 'Este email já está cadastrado.';
-      } else if (error.message.includes('Código de acesso inválido')) {
-        message = error.message;
-      }
-      toast({
-        title: 'Erro',
-        description: message,
-        variant: 'destructive'
-      });
-    } else if (!isLogin) {
-      toast({
-        title: 'Conta criada!',
-        description: 'Você foi conectado automaticamente.'
-      });
+
+    // --- VALIDAÇÃO DAS CHAVES (CODIGOS FIXOS) ---
+    let role = '';
+    if (accessCode === 'MASTER_FLORIPA') role = 'admin';
+    else if (accessCode === 'EQUIPE_2025') role = 'team';
+    else if (accessCode === 'RECEPCAO_EVENTO') role = 'receptionist';
+    else {
+      toast({ title: "Erro", description: "Código de acesso inválido. Verifique com o administrador.", variant: "destructive" });
+      return;
     }
-    setLoading(false);
+
+    setLoading(true);
+    try {
+      // Passamos o cargo (role) e o nome junto com o cadastro
+      await signUp(newEmail, newPassword, { full_name: newName, role: role });
+      toast({ title: "Sucesso!", description: "Conta criada. Verifique seu e-mail (se necessário) ou faça login." });
+      // Opcional: Já logar direto ou pedir login
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
-  return <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md animate-fade-in">
-        <div className="text-center mb-8">
-          
-          <h1 className="text-3xl font-bold text-foreground">Rooftop Floripa Square</h1>
-          <p className="text-muted-foreground mt-2">Check-in de Eventos</p>
-        </div>
 
-        <div className="bg-card rounded-2xl p-8 border border-border shadow-2xl">
-          <div className="flex gap-2 mb-8 p-1 bg-muted rounded-lg">
-            <button onClick={() => setIsLogin(true)} className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${isLogin ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}>
-              Entrar
-            </button>
-            <button onClick={() => setIsLogin(false)} className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${!isLogin ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}>
-              Criar Conta
-            </button>
-          </div>
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-black p-4">
+      <Card className="w-full max-w-md bg-[#1A1A1A] border-[#333] text-white">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center text-[#f37021]">Floripa Event Manager</CardTitle>
+          <CardDescription className="text-center text-gray-400">Acesse o sistema para gerenciar</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-black mb-6">
+              <TabsTrigger value="login">Entrar</TabsTrigger>
+              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2"><Label>Email</Label><Input type="email" value={email} onChange={e=>setEmail(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
+                <div className="space-y-2"><Label>Senha</Label><Input type="password" value={password} onChange={e=>setPassword(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
+                <Button type="submit" className="w-full bg-[#f37021] hover:bg-[#d95d10]" disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : 'Acessar'}</Button>
+              </form>
+            </TabsContent>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {!isLogin && <div className="space-y-2 animate-fade-in">
-                <Label htmlFor="displayName" className="text-foreground">Nome</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="displayName" type="text" placeholder="Seu nome completo" value={displayName} onChange={e => setDisplayName(e.target.value)} className="pl-10 bg-secondary border-border h-12" required />
-                </div>
-              </div>}
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={e => setEmail(e.target.value)} className="pl-10 bg-secondary border-border h-12" required />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground">Senha</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="pl-10 pr-10 bg-secondary border-border h-12" required minLength={6} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            {!isLogin && <>
-                <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="confirmPassword" className="text-foreground">Confirmar Senha</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="confirmPassword" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="pl-10 bg-secondary border-border h-12" required minLength={6} />
-                  </div>
+            <TabsContent value="signup">
+              <form onSubmit={handleSignup} className="space-y-4">
+                <div className="space-y-2"><Label>Nome</Label><Input value={newName} onChange={e=>setNewName(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
+                <div className="space-y-2"><Label>Email</Label><Input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
+                <div className="space-y-2"><Label>Senha</Label><Input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
+                <div className="space-y-2"><Label>Confirmar Senha</Label><Input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required className="bg-black border-[#333] text-white" /></div>
+                
+                {/* CAMPO DE CÓDIGO DE ACESSO */}
+                <div className="space-y-2">
+                  <Label className="text-[#f37021]">Código de Acesso</Label>
+                  <Input 
+                    value={accessCode} 
+                    onChange={e=>setAccessCode(e.target.value)} 
+                    placeholder="Solicite ao administrador"
+                    required 
+                    className="bg-black border-[#f37021]/50 text-white" 
+                  />
                 </div>
 
-                <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="accessCode" className="text-foreground">Código de Acesso</Label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="accessCode" type="text" placeholder="Digite o código fornecido" value={accessCode} onChange={e => setAccessCode(e.target.value)} className="pl-10 bg-secondary border-border h-12 font-mono" required />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Solicite o código de acesso ao administrador do sistema.
-                  </p>
-                </div>
-              </>}
-
-            <Button type="submit" className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading}>
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : isLogin ? 'Entrar' : 'Criar Conta'}
-            </Button>
-          </form>
-        </div>
-      </div>
-    </div>;
+                <Button type="submit" className="w-full bg-[#f37021] hover:bg-[#d95d10]" disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : 'Criar Conta'}</Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
