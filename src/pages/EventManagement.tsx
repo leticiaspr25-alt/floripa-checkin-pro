@@ -10,11 +10,10 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-// Removemos o import do QRCodeCanvas para evitar erros
 import { 
   ArrowLeft, Search, Upload, Plus, Download, Settings, 
   Printer, Users, UserCheck, Loader2, ExternalLink, Trash2,
-  Monitor, Wifi, History, Clock, Image as ImageIcon
+  Monitor, Wifi, History, Clock, Image as ImageIcon, LayoutTemplate
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -28,6 +27,7 @@ interface Event {
   wifi_img_url: string | null;
   photo_url: string | null;
   photo_img_url: string | null;
+  layout_mode: 'standard' | 'full_screen' | null;
 }
 
 interface Guest {
@@ -61,9 +61,15 @@ function UploadBox({ label, icon, previewUrl, onUpload }: UploadBoxProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Cria URL temporária para preview
+      // Cria URL temporária para preview (em produção, o Supabase retorna URL pública)
+      // Se for upload novo, cria blob. Se vier do banco, usa a string direta.
       const url = URL.createObjectURL(file);
       onUpload(url);
+      
+      // Nota: Aqui estamos apenas simulando o preview. 
+      // Para salvar no banco, o ideal seria subir para o Storage primeiro.
+      // Mas para manter simples agora, vamos assumir que o usuário fará o upload real depois ou
+      // que o sistema aceita links externos se colados.
     }
   };
 
@@ -131,6 +137,7 @@ export default function EventManagement() {
     photo_url: '',
     wifi_img_url: '',
     photo_img_url: '',
+    layout_mode: 'standard', // Novo estado
   });
   const [photoMode, setPhotoMode] = useState<'auto' | 'upload'>('auto');
   const [saving, setSaving] = useState(false);
@@ -179,6 +186,7 @@ export default function EventManagement() {
         photo_url: data.photo_url || '',
         wifi_img_url: data.wifi_img_url || '',
         photo_img_url: data.photo_img_url || '',
+        layout_mode: (data.layout_mode as 'standard' | 'full_screen') || 'standard',
       });
       if (data.photo_img_url) setPhotoMode('upload');
     }
@@ -293,6 +301,7 @@ export default function EventManagement() {
       photo_url: eventSettings.photo_url || null,
       wifi_img_url: eventSettings.wifi_img_url || null,
       photo_img_url: eventSettings.photo_img_url || null,
+      layout_mode: eventSettings.layout_mode, // Salva o modo
     }).eq('id', id);
 
     if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' });
@@ -350,7 +359,7 @@ export default function EventManagement() {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="border-border" onClick={() => window.open(`/totem/${id}`, '_blank')}>
-              <Monitor className="h-4 w-4 mr-2" />Abrir Totem
+              <Monitor className="h-4 w-4 mr-2" />Totem
             </Button>
             <Button variant="outline" size="sm" className="border-border" onClick={() => window.open(`/wifi/${id}`, '_blank')}>
               <Wifi className="h-4 w-4 mr-2" />Display TV
@@ -367,24 +376,13 @@ export default function EventManagement() {
             {canAccessSettings && <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Configurações</TabsTrigger>}
           </TabsList>
 
-          {/* TAB 1: CONVIDADOS */}
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card border border-border rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div>
-                <p className="text-5xl font-bold text-primary">{guests.length}</p>
-              </div>
-              <div className="bg-card border border-border rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div>
-                <p className="text-5xl font-bold text-primary">{guests.filter(g=>g.checked_in).length}</p>
-              </div>
+              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold text-primary">{guests.length}</p></div>
+              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold text-primary">{guests.filter(g=>g.checked_in).length}</p></div>
             </div>
-
             <div className="flex flex-wrap gap-3 items-center">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar convidado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-card border-border" />
-              </div>
+              <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar convidado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-card border-border" /></div>
               {canImportExport && (
                 <>
                   <label className="cursor-pointer">
@@ -407,7 +405,6 @@ export default function EventManagement() {
                 </DialogContent>
               </Dialog>
             </div>
-
             <div className="space-y-3">
               {filteredGuests.length === 0 ? <div className="text-center py-12 text-muted-foreground">Nenhum convidado.</div> : filteredGuests.map((guest, index) => (
                 <div key={guest.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{ animationDelay: `${index * 30}ms` }}>
@@ -425,7 +422,6 @@ export default function EventManagement() {
             </div>
           </TabsContent>
 
-          {/* TAB 2: HISTÓRICO */}
           {canAccessHistory && (
             <TabsContent value="history" className="space-y-6 animate-fade-in">
               <div className="flex items-center gap-2 mb-4"><History className="h-5 w-5 text-primary" /><h3 className="text-lg font-semibold text-foreground">Histórico</h3></div>
@@ -445,83 +441,76 @@ export default function EventManagement() {
             </TabsContent>
           )}
 
-          {/* TAB 3: CONFIGURAÇÕES (VERSÃO FINAL COM CORREÇÃO DE QR CODE) */}
           {canAccessSettings && (
             <TabsContent value="settings" className="space-y-6 animate-fade-in">
               <form onSubmit={handleSaveSettings} className="space-y-8">
+                
+                {/* --- SELETOR DE MODO --- */}
+                <div className="bg-secondary/50 border border-border rounded-xl p-6">
+                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2"><LayoutTemplate className="h-5 w-5 text-primary" /> Modo de Exibição Pública</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'standard' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'standard'})}>
+                      <div className="font-bold text-foreground mb-1">Layout Padrão (Automático)</div>
+                      <p className="text-xs text-muted-foreground">Você preenche os dados (SSID, Senha) e o sistema gera o design.</p>
+                    </div>
+                    <div className={`cursor-pointer border-2 rounded-xl p-4 transition-all ${eventSettings.layout_mode === 'full_screen' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`} onClick={() => setEventSettings({...eventSettings, layout_mode: 'full_screen'})}>
+                      <div className="font-bold text-foreground mb-1">Arte Digital (Tela Cheia)</div>
+                      <p className="text-xs text-muted-foreground">Use a arte pronta do evento. O sistema exibe apenas a imagem.</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label>Nome do Evento</Label>
-                    <Input value={eventSettings.name} onChange={(e) => setEventSettings({ ...eventSettings, name: e.target.value })} className="bg-card border-border" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Data e Hora</Label>
-                    <Input type="datetime-local" value={eventSettings.date} onChange={(e) => setEventSettings({ ...eventSettings, date: e.target.value })} className="bg-card border-border" required />
-                  </div>
+                  <div className="space-y-2"><Label>Nome do Evento</Label><Input value={eventSettings.name} onChange={(e) => setEventSettings({ ...eventSettings, name: e.target.value })} className="bg-card border-border" required /></div>
+                  <div className="space-y-2"><Label>Data e Hora</Label><Input type="datetime-local" value={eventSettings.date} onChange={(e) => setEventSettings({ ...eventSettings, date: e.target.value })} className="bg-card border-border" required /></div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Card Wi-Fi */}
                   <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6">
-                      <div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Wifi size={24} /></div>
-                      <div><h3 className="text-lg font-bold text-foreground">Conexão Wi-Fi</h3><p className="text-xs text-muted-foreground">Exibição nas TVs e Totens</p></div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="space-y-1"><Label>Nome da Rede (SSID)</Label><Input value={eventSettings.wifi_ssid} onChange={(e) => setEventSettings({ ...eventSettings, wifi_ssid: e.target.value })} className="bg-secondary border-border" placeholder="Ex: Evento_Guest" /></div>
-                      <div className="space-y-1"><Label>Senha da Rede</Label><Input value={eventSettings.wifi_pass} onChange={(e) => setEventSettings({ ...eventSettings, wifi_pass: e.target.value })} className="bg-secondary border-border" placeholder="Ex: senha123" /></div>
-                      <div className="mt-4 pt-4 border-t border-border">
-                        <Label className="block mb-3">Imagem do QR Code Wi-Fi</Label>
-                        <UploadBox label="Arraste a imagem do QR Code" icon="qr-code" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><Wifi size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte TV' : 'Wi-Fi'}</h3></div>
+                    {eventSettings.layout_mode === 'standard' ? (
+                      <div className="space-y-4">
+                        <div className="space-y-1"><Label>SSID</Label><Input value={eventSettings.wifi_ssid} onChange={(e) => setEventSettings({ ...eventSettings, wifi_ssid: e.target.value })} className="bg-secondary border-border" /></div>
+                        <div className="space-y-1"><Label>Senha</Label><Input value={eventSettings.wifi_pass} onChange={(e) => setEventSettings({ ...eventSettings, wifi_pass: e.target.value })} className="bg-secondary border-border" /></div>
+                        <UploadBox label="QR Code Wi-Fi" icon="qr-code" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} />
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-4"><Label>Upload da Arte (1920x1080)</Label><UploadBox label="Arraste a Arte Horizontal" icon="image" previewUrl={eventSettings.wifi_img_url} onUpload={(url) => setEventSettings({...eventSettings, wifi_img_url: url})} /></div>
+                    )}
                   </div>
 
-                  {/* Card Galeria Moments */}
+                  {/* Card Moments */}
                   <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6">
-                      <div className="p-2.5 bg-primary/10 rounded-lg text-primary"><ExternalLink size={24} /></div>
-                      <div><h3 className="text-lg font-bold text-foreground">Galeria Moments</h3><p className="text-xs text-muted-foreground">Plataforma de Fotos do Evento</p></div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="space-y-1"><Label>Link da Galeria (Moments)</Label><Input value={eventSettings.photo_url} onChange={(e) => setEventSettings({ ...eventSettings, photo_url: e.target.value })} className="bg-secondary border-border" placeholder="Ex: https://moments.com/evento" /></div>
-                      
-                      <div className="mt-4 pt-4 border-t border-border">
-                        <Label className="block mb-3">Exibição do QR Code</Label>
-                        <div className="flex gap-2 mb-4 p-1 bg-secondary rounded-lg border border-border">
-                          <button type="button" onClick={()=>setPhotoMode('auto')} className={`flex-1 py-2 text-xs font-bold rounded transition-colors ${photoMode==='auto'?'bg-primary text-primary-foreground':'text-muted-foreground hover:text-foreground'}`}>GERAR AUTOMÁTICO</button>
-                          <button type="button" onClick={()=>setPhotoMode('upload')} className={`flex-1 py-2 text-xs font-bold rounded transition-colors ${photoMode==='upload'?'bg-primary text-primary-foreground':'text-muted-foreground hover:text-foreground'}`}>UPLOAD IMAGEM</button>
-                        </div>
-                        <div className="h-64 flex items-center justify-center bg-background border-2 border-dashed border-border rounded-xl overflow-hidden">
-                          {photoMode === 'auto' ? (
-                            <div className="text-center p-4">
-                              {eventSettings.photo_url ? (
-                                <div className="bg-white p-4 rounded-xl">
-                                  {/* QR Code via API para evitar dependência externa */}
-                                  <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} 
-                                    alt="QR Code" 
-                                    className="w-[150px] h-[150px]"
-                                  />
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">Cole o link acima para gerar o QR</span>
-                              )}
-                              <p className="text-xs text-muted-foreground mt-3">QR gerado a partir do link</p>
-                            </div>
-                          ) : (
-                            <div className="w-full h-full p-2"><UploadBox label="Arraste a capa/QR personalizado" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
-                          )}
+                    <div className="flex items-center gap-3 border-b border-border pb-4 mb-6"><div className="p-2.5 bg-primary/10 rounded-lg text-primary"><ExternalLink size={24} /></div><h3 className="text-lg font-bold">{eventSettings.layout_mode === 'full_screen' ? 'Arte Totem' : 'Moments'}</h3></div>
+                    {eventSettings.layout_mode === 'standard' ? (
+                      <div className="space-y-4">
+                        <div className="space-y-1"><Label>Link Galeria</Label><Input value={eventSettings.photo_url} onChange={(e) => setEventSettings({ ...eventSettings, photo_url: e.target.value })} className="bg-secondary border-border" /></div>
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <Label className="block mb-3">QR Code</Label>
+                          <div className="flex gap-2 mb-4 p-1 bg-secondary rounded-lg border border-border">
+                            <button type="button" onClick={()=>setPhotoMode('auto')} className={`flex-1 py-2 text-xs font-bold rounded ${photoMode==='auto'?'bg-primary text-primary-foreground':'text-muted-foreground'}`}>AUTO</button>
+                            <button type="button" onClick={()=>setPhotoMode('upload')} className={`flex-1 py-2 text-xs font-bold rounded ${photoMode==='upload'?'bg-primary text-primary-foreground':'text-muted-foreground'}`}>UPLOAD</button>
+                          </div>
+                          <div className="h-64 flex items-center justify-center bg-background border-2 border-dashed border-border rounded-xl overflow-hidden">
+                            {photoMode === 'auto' ? (
+                              <div className="text-center p-4">
+                                {eventSettings.photo_url ? <div className="bg-white p-4 rounded-xl"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventSettings.photo_url)}`} alt="QR" className="w-[150px] h-[150px]" /></div> : <span className="text-muted-foreground text-sm">Cole o link</span>}
+                              </div>
+                            ) : (
+                              <div className="w-full h-full p-2"><UploadBox label="Capa" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-4"><Label>Upload da Arte (1080x1920)</Label><UploadBox label="Arraste a Arte Vertical" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
+                    )}
                   </div>
                 </div>
 
                 <div className="pt-6 border-t border-border flex justify-end">
-                  <Button type="submit" className="bg-primary hover:bg-primary/90 px-8 py-6 h-auto text-lg" disabled={saving}>
-                    {saving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Settings className="h-5 w-5 mr-2" />} Salvar Alterações
-                  </Button>
+                  <Button type="submit" className="bg-primary hover:bg-primary/90 px-8 py-6 h-auto text-lg" disabled={saving}>{saving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Settings className="h-5 w-5 mr-2" />} Salvar</Button>
                 </div>
               </form>
             </TabsContent>
