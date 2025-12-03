@@ -54,7 +54,7 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Cria URL de preview local
+      // Cria URL temporária para preview
       const url = URL.createObjectURL(file);
       onUpload(url);
     }
@@ -65,7 +65,13 @@ function UploadBox({ label, icon, previewUrl, onUpload }: { label: string, icon?
       className="border-2 border-dashed border-border bg-card/50 rounded-xl h-48 flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all group relative overflow-hidden"
       onClick={() => inputRef.current?.click()}
     >
-      <input type="file" hidden ref={inputRef} onChange={handleFileChange} accept="image/*" />
+      <input 
+        type="file" 
+        hidden 
+        ref={inputRef} 
+        onChange={handleFileChange} 
+        accept="image/*" 
+      />
       
       {previewUrl ? (
         <div className="absolute inset-0 w-full h-full">
@@ -283,7 +289,7 @@ export default function EventManagement() {
     const exportData = guests.map(g => ({
       Nome: g.name, Empresa: g.company || '', Cargo: g.role || '',
       'Check-in': g.checked_in ? 'Sim' : 'Não',
-      'Hora': g.checkin_time ? new Date(g.checkin_time).toLocaleString('pt-BR') : '',
+      'Hora Check-in': g.checkin_time ? new Date(g.checkin_time).toLocaleString('pt-BR') : '',
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -537,11 +543,7 @@ export default function EventManagement() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        <Label>Upload da Arte Vertical (1080x1920)</Label>
-                        <UploadBox label="Arraste a Arte Pronta" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} />
-                        <p className="text-xs text-muted-foreground">Esta imagem vai para a rota /totem</p>
-                      </div>
+                      <div className="space-y-4"><Label>Upload da Arte Vertical (1080x1920)</Label><UploadBox label="Arraste a Arte Vertical" icon="image" previewUrl={eventSettings.photo_img_url} onUpload={(url) => setEventSettings({...eventSettings, photo_img_url: url})} /></div>
                     )}
                   </div>
                 </div>
