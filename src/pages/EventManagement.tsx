@@ -160,6 +160,11 @@ export default function EventManagement() {
 
   useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
   useEffect(() => { if (id && user) { fetchEvent(); fetchGuests(); subscribeToGuests(); } }, [id, user]);
+  useEffect(() => {
+    const handleAfterPrint = () => setPrintingGuest(null);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, []);
 
   const fetchEvent = async () => {
     const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
@@ -226,7 +231,14 @@ export default function EventManagement() {
   };
 
   const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu', `${guest.name}`); await fetchGuests(); } };
-  const handlePrint = (guest: Guest) => { setPrintingGuest(guest); setTimeout(() => { window.print(); setPrintingGuest(null); }, 100); };
+  const handlePrint = (guest: Guest) => {
+    setPrintingGuest(guest);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print();
+      });
+    });
+  };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canImportExport) return; const file = e.target.files?.[0]; if (!file) return;
@@ -348,6 +360,9 @@ export default function EventManagement() {
 
           /* NOME: 14pt e NUNCA QUEBRA LINHA */
           .guest-name {
+            display: block !important;
+            opacity: 1 !important;
+            position: relative !important;
             font-family: 'Inter', Arial, sans-serif !important;
             font-weight: 800 !important;
             font-size: 17pt !important;
@@ -365,6 +380,9 @@ export default function EventManagement() {
 
           /* EMPRESA: 14pt e NUNCA QUEBRA LINHA */
           .guest-company {
+            display: block !important;
+            opacity: 1 !important;
+            position: relative !important;
             font-family: 'Inter', Arial, sans-serif !important;
             font-weight: 500 !important;
             font-size: 10pt !important;
