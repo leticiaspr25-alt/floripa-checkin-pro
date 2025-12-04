@@ -280,27 +280,31 @@ export default function EventManagement() {
             orientation: landscape;
           }
 
-          /* Esconde o corpo do site */
+          /* Esconde o corpo do site e força fundo branco */
           html, body {
             margin: 0 !important;
             padding: 0 !important;
             width: 90mm !important;
             height: 35mm !important;
+            background: white !important;
+            background-color: white !important;
           }
 
           body * { visibility: hidden; }
 
-          /* Container de impressão - FORÇA LAYOUT HORIZONTAL */
+          /* Container de impressão */
           .print-container {
             visibility: visible !important;
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
             width: 90mm !important;
-            height: auto !important;
+            height: 35mm !important;
             margin: 0 !important;
             padding: 0 !important;
             transform: none !important;
+            background: white !important;
+            background-color: white !important;
           }
 
           /* Força fundo branco e texto preto */
