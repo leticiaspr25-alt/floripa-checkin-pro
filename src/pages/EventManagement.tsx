@@ -181,8 +181,33 @@ export default function EventManagement() {
 
   const handleToggleCheckIn = async (guest: Guest) => {
     const newCheckedIn = !guest.checked_in;
-    const { error } = await supabase.from('guests').update({ checked_in: newCheckedIn, checkin_time: newCheckedIn ? new Date().toISOString() : null }).eq('id', guest.id);
-    if (error) toast({ title: 'Erro', description: 'Falha ao atualizar.', variant: 'destructive' }); else await logActivity(newCheckedIn ? 'Check-in' : 'Check-out', `${guest.name}`);
+    const checkinTime = newCheckedIn ? new Date().toISOString() : null;
+
+    // ATUALIZAÇÃO OTIMISTA: muda na tela ANTES de esperar o banco
+    setGuests(prev => prev.map(g =>
+      g.id === guest.id
+        ? { ...g, checked_in: newCheckedIn, checkin_time: checkinTime }
+        : g
+    ));
+
+    // Requisição ao banco em background
+    const { error } = await supabase
+      .from('guests')
+      .update({ checked_in: newCheckedIn, checkin_time: checkinTime })
+      .eq('id', guest.id);
+
+    if (error) {
+      // Reverte se der erro
+      setGuests(prev => prev.map(g =>
+        g.id === guest.id
+          ? { ...g, checked_in: guest.checked_in, checkin_time: guest.checkin_time }
+          : g
+      ));
+      toast({ title: 'Erro', description: 'Falha ao atualizar.', variant: 'destructive' });
+    } else {
+      // Log em background (sem await - não bloqueia)
+      logActivity(newCheckedIn ? 'Check-in' : 'Check-out', guest.name);
+    }
   };
 
   const handleAddGuest = async (e: React.FormEvent) => {
