@@ -347,7 +347,7 @@ export default function EventManagement() {
           .guest-name {
             font-family: 'Inter', Arial, sans-serif !important;
             font-weight: 800 !important;
-            font-size: 14pt !important;
+            font-size: 17pt !important;
             line-height: 1.1 !important;
             width: 100% !important;
 
@@ -360,7 +360,7 @@ export default function EventManagement() {
             color: black !important;
           }
 
-          /* EMPRESA: 10pt e NUNCA QUEBRA LINHA */
+          /* EMPRESA: 14pt e NUNCA QUEBRA LINHA */
           .guest-company {
             font-family: 'Inter', Arial, sans-serif !important;
             font-weight: 500 !important;
