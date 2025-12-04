@@ -307,11 +307,17 @@ export default function EventManagement() {
             background-color: white !important;
           }
 
-          /* Força fundo branco e texto preto */
-          .print-label, .print-label * {
+          /* Força visibilidade e cores corretas */
+          .print-container,
+          .print-container *,
+          .print-label,
+          .print-label *,
+          .guest-name,
+          .guest-company {
             visibility: visible !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
 
           .print-label {
