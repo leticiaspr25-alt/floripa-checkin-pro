@@ -379,21 +379,6 @@ export default function EventManagement() {
         }
       `}</style>
 
-      {/* CONTAINER DE IMPRESSÃO DUPLA */}
-      {printingGuest && (
-        <div className="print-container">
-          <div className="print-label">
-            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
-            {/* Empresa só aparece se existir */}
-            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
-          </div>
-          <div className="print-label">
-            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
-            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
-          </div>
-        </div>
-      )}
-
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4"><Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}><ArrowLeft className="h-5 w-5" /></Button><h1 className="text-lg font-semibold text-foreground truncate">{event?.name}</h1></div>
