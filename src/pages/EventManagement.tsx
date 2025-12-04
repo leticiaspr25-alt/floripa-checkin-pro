@@ -245,65 +245,110 @@ export default function EventManagement() {
   return (
     <div className="min-h-screen bg-background">
       
-      {/* CSS IMPRESSÃO BLINDADO: CORREÇÃO TOTAL */}
+      {/* CSS IMPRESSÃO BLINDADO: ORIENTAÇÃO TRAVADA EM LANDSCAPE */}
       <style>{`
         @media print {
-          @page { size: 90mm 35mm; margin: 0; }
-          
+          /* FORÇA ORIENTAÇÃO HORIZONTAL (LANDSCAPE) */
+          @page {
+            size: 90mm 35mm landscape;
+            margin: 0;
+            orientation: landscape;
+          }
+
           /* Esconde o corpo do site */
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 90mm !important;
+            height: 35mm !important;
+          }
+
           body * { visibility: hidden; }
-          
-          /* Força fundo branco e texto preto (Resolve o problema da etiqueta preta) */
-          .print-label, .print-label * { 
-            visibility: visible !important; 
-            -webkit-print-color-adjust: exact; 
+
+          /* Container de impressão - FORÇA LAYOUT HORIZONTAL */
+          .print-container {
+            visibility: visible !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 90mm !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            transform: none !important;
+          }
+
+          /* Força fundo branco e texto preto */
+          .print-label, .print-label * {
+            visibility: visible !important;
+            -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
-          
-          .print-label { 
-            position: relative; 
-            width: 90mm; 
-            height: 35mm; 
-            max-height: 35mm; /* Trava de Altura */
-            
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            text-align: center; 
-            
-            background: white !important; 
-            color: black !important; 
-            
-            padding: 0 3mm; 
-            box-sizing: border-box; 
-            overflow: hidden; 
-            page-break-after: always; /* Imprime 2x (frente e verso) */
+
+          .print-label {
+            position: relative !important;
+            width: 90mm !important;
+            height: 35mm !important;
+            min-width: 90mm !important;
+            min-height: 35mm !important;
+            max-width: 90mm !important;
+            max-height: 35mm !important;
+
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            text-align: center !important;
+
+            background: white !important;
+            color: black !important;
+
+            padding: 0 3mm !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+            page-break-after: always !important;
+            page-break-inside: avoid !important;
+            break-after: page !important;
+            break-inside: avoid !important;
           }
-          
-          .print-label:last-child { page-break-after: auto; } /* Economia de papel */
-          
+
+          .print-label:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+
           /* NOME: 14pt e NUNCA QUEBRA LINHA */
-          .guest-name { 
-            font-family: 'Inter', sans-serif; font-weight: 800; 
-            font-size: 14pt !important; 
-            line-height: 1.1; width: 100%; 
-            
-            white-space: nowrap !important; /* FORÇA 1 LINHA */
-            overflow: hidden; text-overflow: ellipsis; /* Corta com ... */
-            
-            margin-bottom: 1.5mm; 
+          .guest-name {
+            font-family: 'Inter', Arial, sans-serif !important;
+            font-weight: 800 !important;
+            font-size: 14pt !important;
+            line-height: 1.1 !important;
+            width: 100% !important;
+
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+
+            margin: 0 0 1.5mm 0 !important;
+            padding: 0 !important;
             color: black !important;
           }
-          
+
           /* EMPRESA: 10pt e NUNCA QUEBRA LINHA */
-          .guest-company { 
-            font-family: 'Inter', sans-serif; font-weight: 500; 
-            font-size: 10pt !important; 
-            width: 100%; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
+          .guest-company {
+            font-family: 'Inter', Arial, sans-serif !important;
+            font-weight: 500 !important;
+            font-size: 10pt !important;
+            line-height: 1.2 !important;
+            width: 100% !important;
+
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+
+            margin: 0 !important;
+            padding: 0 !important;
             color: black !important;
           }
         }
