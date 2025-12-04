@@ -332,15 +332,8 @@ export default function EventManagement() {
             margin: 0 !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
-            page-break-after: always !important;
             page-break-inside: avoid !important;
-            break-after: page !important;
             break-inside: avoid !important;
-          }
-
-          .print-label:last-child {
-            page-break-after: auto !important;
-            break-after: auto !important;
           }
 
           /* NOME: 14pt e NUNCA QUEBRA LINHA */
@@ -378,6 +371,16 @@ export default function EventManagement() {
           }
         }
       `}</style>
+
+      {/* CONTAINER DE IMPRESSÃO - UMA ETIQUETA */}
+      {printingGuest && (
+        <div className="print-container">
+          <div className="print-label">
+            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
+            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
+          </div>
+        </div>
+      )}
 
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
