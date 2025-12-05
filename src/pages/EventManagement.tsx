@@ -138,6 +138,7 @@ export default function EventManagement() {
   const [newGuest, setNewGuest] = useState({ name: '', company: '', role: '' });
   const [adding, setAdding] = useState(false);
   const [printingGuest, setPrintingGuest] = useState<Guest | null>(null);
+  const [previewGuest, setPreviewGuest] = useState<Guest | null>(null);
 
   const [editGuestOpen, setEditGuestOpen] = useState(false);
   const [guestToEdit, setGuestToEdit] = useState<Guest | null>(null);
@@ -231,8 +232,15 @@ export default function EventManagement() {
   };
 
   const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu', `${guest.name}`); await fetchGuests(); } };
-  const handlePrint = (guest: Guest) => {
-    setPrintingGuest(guest);
+  
+  const handleOpenPreview = (guest: Guest) => {
+    setPreviewGuest(guest);
+  };
+
+  const handleConfirmPrint = () => {
+    if (!previewGuest) return;
+    setPrintingGuest(previewGuest);
+    setPreviewGuest(null);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         window.print();
@@ -440,7 +448,7 @@ export default function EventManagement() {
               <Dialog open={addGuestOpen} onOpenChange={setAddGuestOpen}><DialogTrigger asChild><Button variant="outline" className="border-border"><Plus className="h-4 w-4 mr-2" />Manual</Button></DialogTrigger><DialogContent className="bg-card border-border"><DialogHeader><DialogTitle>Adicionar Convidado</DialogTitle></DialogHeader><form onSubmit={handleAddGuest} className="space-y-4 mt-4"><Input placeholder="Nome" value={newGuest.name} onChange={e=>setNewGuest({...newGuest, name: e.target.value})} required className="bg-secondary border-border" /><Input placeholder="Empresa" value={newGuest.company} onChange={e=>setNewGuest({...newGuest, company: e.target.value})} className="bg-secondary border-border" /><Input placeholder="Cargo" value={newGuest.role} onChange={e=>setNewGuest({...newGuest, role: e.target.value})} className="bg-secondary border-border" /><Button type="submit" className="w-full bg-primary" disabled={adding}>Adicionar</Button></form></DialogContent></Dialog>
             </div>
             <div className="space-y-3">
-              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">{canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }}><Pencil className="h-4 w-4"/></Button>}<Button variant="ghost" size="icon" onClick={()=>handlePrint(g)}><Printer className="h-4 w-4"/></Button>{canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
+              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">{canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }}><Pencil className="h-4 w-4"/></Button>}<Button variant="ghost" size="icon" onClick={()=>handleOpenPreview(g)}><Printer className="h-4 w-4"/></Button>{canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
             </div>
           </TabsContent>
 
@@ -478,6 +486,64 @@ export default function EventManagement() {
               <div className="space-y-2"><Label>Cargo</Label><Input value={editFormData.role} onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })} className="bg-secondary border-border" /></div>
               <Button type="submit" className="w-full bg-primary" disabled={adding}>Salvar Alterações</Button>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* MODAL PREVIEW DA ETIQUETA */}
+        <Dialog open={!!previewGuest} onOpenChange={(open) => !open && setPreviewGuest(null)}>
+          <DialogContent className="bg-card border-border max-w-md">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><Printer className="h-5 w-5 text-primary" />Preview da Etiqueta</DialogTitle></DialogHeader>
+            <div className="mt-4 space-y-4">
+              <p className="text-sm text-muted-foreground">Confira como a etiqueta ficará antes de imprimir:</p>
+              
+              {/* PREVIEW VISUAL DA ETIQUETA */}
+              <div className="border-2 border-dashed border-border rounded-lg p-4 bg-white">
+                <div 
+                  className="mx-auto bg-white border border-gray-300 shadow-sm flex flex-col justify-center items-center text-center"
+                  style={{ 
+                    width: '90mm', 
+                    height: '35mm', 
+                    maxWidth: '100%',
+                    aspectRatio: '90 / 35',
+                    padding: '0 3mm',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <div 
+                    className="font-bold text-black truncate w-full"
+                    style={{ 
+                      fontFamily: "'Inter', Arial, sans-serif",
+                      fontWeight: 800,
+                      fontSize: 'clamp(14px, 4vw, 17pt)',
+                      lineHeight: 1.1,
+                      marginBottom: '1.5mm'
+                    }}
+                  >
+                    {previewGuest && formatNameForBadge(previewGuest.name)}
+                  </div>
+                  {previewGuest?.company && (
+                    <div 
+                      className="text-black truncate w-full"
+                      style={{ 
+                        fontFamily: "'Inter', Arial, sans-serif",
+                        fontWeight: 500,
+                        fontSize: 'clamp(10px, 2.5vw, 10pt)',
+                        lineHeight: 1.2
+                      }}
+                    >
+                      {previewGuest.company}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">Tamanho: 90mm × 35mm (Bematech)</p>
+
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setPreviewGuest(null)}>Cancelar</Button>
+                <Button className="flex-1 bg-primary" onClick={handleConfirmPrint}><Printer className="h-4 w-4 mr-2" />Imprimir</Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </main>
