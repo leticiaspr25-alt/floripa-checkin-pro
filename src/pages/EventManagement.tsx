@@ -31,6 +31,8 @@ interface Event {
   photo_img_url: string | null;
   event_logo_url: string | null;
   primary_color: string | null;
+  secondary_color: string | null;
+  tertiary_color: string | null;
 }
 
 interface Guest {
@@ -173,7 +175,7 @@ export default function EventManagement() {
 
   const [eventSettings, setEventSettings] = useState({
     name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: '',
-    event_logo_url: '', primary_color: '#f37021'
+    event_logo_url: '', primary_color: '#f37021', secondary_color: '', tertiary_color: ''
   });
 
   const canImportExport = isAdmin || isEquipe;
@@ -204,7 +206,8 @@ export default function EventManagement() {
         name: data.name, date: new Date(data.date).toISOString().slice(0, 16),
         wifi_ssid: data.wifi_ssid || '', wifi_pass: data.wifi_pass || '',
         photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', photo_img_url: data.photo_img_url || '',
-        event_logo_url: data.event_logo_url || '', primary_color: data.primary_color || '#f37021'
+        event_logo_url: data.event_logo_url || '', primary_color: data.primary_color || '#f37021',
+        secondary_color: data.secondary_color || '', tertiary_color: data.tertiary_color || ''
       });
     }
     setLoading(false);
@@ -354,7 +357,8 @@ export default function EventManagement() {
       name: eventSettings.name, date: new Date(eventSettings.date).toISOString(),
       wifi_ssid: eventSettings.wifi_ssid || null, wifi_pass: eventSettings.wifi_pass || null,
       photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null, photo_img_url: eventSettings.photo_img_url || null,
-      event_logo_url: eventSettings.event_logo_url || null, primary_color: eventSettings.primary_color || '#f37021'
+      event_logo_url: eventSettings.event_logo_url || null, primary_color: eventSettings.primary_color || '#f37021',
+      secondary_color: eventSettings.secondary_color || null, tertiary_color: eventSettings.tertiary_color || null
     }).eq('id', id);
     if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Salvo!' }); await logActivity('Atualizou configurações', 'Alterações salvas'); fetchEvent(); }
     setSaving(false);
@@ -607,74 +611,108 @@ export default function EventManagement() {
                     <ImageIcon className="h-5 w-5 text-primary" />
                     Identidade Visual do Evento
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Logo do Evento */}
-                    <div className="space-y-3">
-                      <Label>Logo do Evento</Label>
+                  {/* Logo do Evento */}
+                  <div className="space-y-3 mb-6">
+                    <Label>Logo do Evento</Label>
+                    <div className="max-w-xs">
                       <UploadBox
                         label="Logo do Evento"
                         icon="image"
                         previewUrl={eventSettings.event_logo_url}
                         onUpload={(url) => setEventSettings({...eventSettings, event_logo_url: url})}
                       />
-                      <p className="text-xs text-muted-foreground">Aparecerá no Totem e na TV</p>
                     </div>
-                    {/* Cor Principal */}
-                    <div className="space-y-3">
-                      <Label>Cor Principal do Evento</Label>
+                    <p className="text-xs text-muted-foreground">Aparecerá no Totem e na TV</p>
+                  </div>
 
-                      {/* Paleta de cores pré-definidas */}
-                      <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">Selecione uma cor:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {[
-                            { color: '#f37021', name: 'Laranja' },
-                            { color: '#3b82f6', name: 'Azul' },
-                            { color: '#10b981', name: 'Verde' },
-                            { color: '#8b5cf6', name: 'Roxo' },
-                            { color: '#ef4444', name: 'Vermelho' },
-                            { color: '#ec4899', name: 'Rosa' },
-                            { color: '#f59e0b', name: 'Amarelo' },
-                            { color: '#06b6d4', name: 'Ciano' },
-                          ].map(({ color, name }) => (
-                            <button
-                              key={color}
-                              type="button"
-                              onClick={() => setEventSettings({...eventSettings, primary_color: color})}
-                              className={`w-10 h-10 rounded-lg transition-all hover:scale-110 ${
-                                eventSettings.primary_color === color
-                                  ? 'ring-2 ring-white ring-offset-2 ring-offset-background'
-                                  : 'hover:ring-1 hover:ring-border'
-                              }`}
-                              style={{ backgroundColor: color }}
-                              title={name}
+                  {/* Cores do Evento - 3 cores */}
+                  <div className="space-y-4">
+                      <Label>Paleta de Cores do Evento (até 3 cores)</Label>
+                      <p className="text-xs text-muted-foreground">Defina as cores que representam a identidade visual do evento</p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Cor Principal */}
+                        <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-foreground">Cor Principal</span>
+                            <span className="text-xs text-muted-foreground">Obrigatória</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={eventSettings.primary_color}
+                              onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
+                              className="w-12 h-12 rounded-lg cursor-pointer border-2 border-border"
                             />
-                          ))}
+                            <Input
+                              value={eventSettings.primary_color}
+                              onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
+                              className="bg-card border-border font-mono text-sm flex-1"
+                              placeholder="#f37021"
+                            />
+                          </div>
+                          <div className="h-3 rounded-full" style={{ backgroundColor: eventSettings.primary_color }} />
+                        </div>
+
+                        {/* Cor Secundária */}
+                        <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-foreground">Cor Secundária</span>
+                            <span className="text-xs text-muted-foreground">Opcional</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={eventSettings.secondary_color || '#888888'}
+                              onChange={e => setEventSettings({...eventSettings, secondary_color: e.target.value})}
+                              className="w-12 h-12 rounded-lg cursor-pointer border-2 border-border"
+                            />
+                            <Input
+                              value={eventSettings.secondary_color}
+                              onChange={e => setEventSettings({...eventSettings, secondary_color: e.target.value})}
+                              className="bg-card border-border font-mono text-sm flex-1"
+                              placeholder="#888888"
+                            />
+                          </div>
+                          <div className="h-3 rounded-full" style={{ backgroundColor: eventSettings.secondary_color || '#444' }} />
+                        </div>
+
+                        {/* Cor Terciária */}
+                        <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-foreground">Cor Terciária</span>
+                            <span className="text-xs text-muted-foreground">Opcional</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={eventSettings.tertiary_color || '#cccccc'}
+                              onChange={e => setEventSettings({...eventSettings, tertiary_color: e.target.value})}
+                              className="w-12 h-12 rounded-lg cursor-pointer border-2 border-border"
+                            />
+                            <Input
+                              value={eventSettings.tertiary_color}
+                              onChange={e => setEventSettings({...eventSettings, tertiary_color: e.target.value})}
+                              className="bg-card border-border font-mono text-sm flex-1"
+                              placeholder="#cccccc"
+                            />
+                          </div>
+                          <div className="h-3 rounded-full" style={{ backgroundColor: eventSettings.tertiary_color || '#666' }} />
                         </div>
                       </div>
 
-                      {/* Cor personalizada */}
-                      <div className="flex items-center gap-3 pt-2">
-                        <input
-                          type="color"
-                          value={eventSettings.primary_color}
-                          onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
-                          className="w-10 h-10 rounded-lg cursor-pointer border-2 border-border"
-                        />
-                        <Input
-                          value={eventSettings.primary_color}
-                          onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
-                          className="bg-card border-border font-mono flex-1"
-                          placeholder="#f37021"
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">Ou escolha uma cor personalizada</p>
-
-                      {/* Preview da cor */}
-                      <div className="flex gap-2 mt-2">
-                        <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color }} />
-                        <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color, opacity: 0.5 }} />
-                        <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color, opacity: 0.2 }} />
+                      {/* Preview combinado das 3 cores */}
+                      <div className="mt-4 p-4 bg-black/20 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Preview da paleta:</p>
+                        <div className="flex gap-2 h-10">
+                          <div className="flex-[3] rounded-lg" style={{ backgroundColor: eventSettings.primary_color }} />
+                          {eventSettings.secondary_color && (
+                            <div className="flex-[2] rounded-lg" style={{ backgroundColor: eventSettings.secondary_color }} />
+                          )}
+                          {eventSettings.tertiary_color && (
+                            <div className="flex-1 rounded-lg" style={{ backgroundColor: eventSettings.tertiary_color }} />
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
