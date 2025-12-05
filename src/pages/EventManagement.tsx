@@ -152,7 +152,6 @@ export default function EventManagement() {
   const [addGuestOpen, setAddGuestOpen] = useState(false);
   const [newGuest, setNewGuest] = useState({ name: '', company: '', role: '' });
   const [adding, setAdding] = useState(false);
-  const [printingGuest, setPrintingGuest] = useState<Guest | null>(null);
   const [previewGuest, setPreviewGuest] = useState<Guest | null>(null);
 
   // Estados para ajuste de fonte da etiqueta (valores em pt)
@@ -172,7 +171,6 @@ export default function EventManagement() {
   const [staffToEdit, setStaffToEdit] = useState<Staff | null>(null);
   const [editStaffFormData, setEditStaffFormData] = useState({ name: '', role: '' });
   const [previewStaff, setPreviewStaff] = useState<Staff | null>(null);
-  const [printingStaff, setPrintingStaff] = useState<Staff | null>(null);
 
   const [eventSettings, setEventSettings] = useState({
     name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: '',
@@ -192,11 +190,6 @@ export default function EventManagement() {
 
   useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
   useEffect(() => { if (id && user) { fetchEvent(); fetchGuests(); fetchStaff(); subscribeToGuests(); subscribeToStaff(); } }, [id, user]);
-  useEffect(() => {
-    const handleAfterPrint = () => { setPrintingGuest(null); setPrintingStaff(null); };
-    window.addEventListener('afterprint', handleAfterPrint);
-    return () => window.removeEventListener('afterprint', handleAfterPrint);
-  }, []);
 
   const fetchEvent = async () => {
     const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
@@ -307,45 +300,126 @@ export default function EventManagement() {
   };
 
   const handleOpenStaffPreview = (s: Staff) => { setPreviewStaff(s); };
+  const handleOpenPreview = (guest: Guest) => { setPreviewGuest(guest); };
+
+  // Função de impressão via iframe - mais confiável
+  const printViaIframe = (name: string, subtitle: string) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.top = '-9999px';
+    iframe.style.left = '-9999px';
+    iframe.style.width = '90mm';
+    iframe.style.height = '35mm';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      document.body.removeChild(iframe);
+      return;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;800&display=swap" rel="stylesheet">
+        <style>
+          @page {
+            size: 90mm 35mm;
+            margin: 0;
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          html, body {
+            width: 90mm;
+            height: 35mm;
+            margin: 0;
+            padding: 0;
+            background: white;
+          }
+          .label {
+            width: 90mm;
+            height: 35mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 0 3mm;
+            background: white;
+            font-family: 'Inter', Arial, sans-serif;
+          }
+          .name {
+            font-weight: 800;
+            font-size: ${nameFontSize}pt;
+            line-height: 1.1;
+            color: #000000;
+            margin-bottom: 1.5mm;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .subtitle {
+            font-weight: 500;
+            font-size: ${companyFontSize}pt;
+            line-height: 1.2;
+            color: #000000;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="label">
+          <div class="name">${name}</div>
+          ${subtitle ? `<div class="subtitle">${subtitle}</div>` : ''}
+        </div>
+      </body>
+      </html>
+    `;
+
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    // Aguarda a fonte carregar antes de imprimir
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        // Remove o iframe após um tempo
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 500);
+    };
+  };
 
   const handleConfirmStaffPrint = () => {
     if (!previewStaff) return;
-    const staffToPrint = previewStaff;
+    const name = formatNameForBadge(previewStaff.name);
+    const role = previewStaff.role || 'Equipe';
     setPreviewStaff(null);
-    // Aguarda o modal fechar antes de setar o staff para impressão
     setTimeout(() => {
-      setPrintingStaff(staffToPrint);
-      // Aguarda o React renderizar e o browser pintar
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            window.print();
-          }, 300);
-        });
-      });
-    }, 200);
-  };
-
-  const handleOpenPreview = (guest: Guest) => {
-    setPreviewGuest(guest);
+      printViaIframe(name, role);
+    }, 100);
   };
 
   const handleConfirmPrint = () => {
     if (!previewGuest) return;
-    const guestToPrint = previewGuest;
+    const name = formatNameForBadge(previewGuest.name);
+    const company = previewGuest.company || '';
     setPreviewGuest(null);
-    // Aguarda o modal fechar antes de setar o guest para impressão
     setTimeout(() => {
-      setPrintingGuest(guestToPrint);
-      // Aguarda o React renderizar e o browser pintar
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            window.print();
-          }, 300);
-        });
-      });
-    }, 200);
+      printViaIframe(name, company);
+    }, 100);
   };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -485,136 +559,6 @@ export default function EventManagement() {
           }
         }
       `}</style>
-
-      {/* CONTAINER DE IMPRESSÃO - CONVIDADO */}
-      {printingGuest && (
-        <div
-          className="print-container"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '90mm',
-            height: '35mm',
-            zIndex: 99999,
-            background: 'white',
-            visibility: 'visible',
-            opacity: 1
-          }}
-        >
-          <div
-            className="print-label"
-            style={{
-              width: '90mm',
-              height: '35mm',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              textAlign: 'center',
-              background: 'white',
-              padding: '0 3mm',
-              boxSizing: 'border-box',
-              visibility: 'visible',
-              opacity: 1
-            }}
-          >
-            <div
-              className="guest-name"
-              style={{
-                fontFamily: 'Inter, Arial, sans-serif',
-                fontWeight: 800,
-                fontSize: `${nameFontSize}pt`,
-                lineHeight: 1.1,
-                color: '#000000',
-                margin: '0 0 1.5mm 0',
-                visibility: 'visible'
-              }}
-            >
-              {formatNameForBadge(printingGuest.name)}
-            </div>
-            {printingGuest.company && (
-              <div
-                className="guest-company"
-                style={{
-                  fontFamily: 'Inter, Arial, sans-serif',
-                  fontWeight: 500,
-                  fontSize: `${companyFontSize}pt`,
-                  lineHeight: 1.2,
-                  color: '#000000',
-                  visibility: 'visible'
-                }}
-              >
-                {printingGuest.company}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* CONTAINER DE IMPRESSÃO - Equipe */}
-      {printingStaff && (
-        <div
-          className="print-container"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '90mm',
-            height: '35mm',
-            zIndex: 99999,
-            background: 'white',
-            visibility: 'visible',
-            opacity: 1
-          }}
-        >
-          <div
-            className="print-label"
-            style={{
-              width: '90mm',
-              height: '35mm',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              textAlign: 'center',
-              background: 'white',
-              padding: '0 3mm',
-              boxSizing: 'border-box',
-              visibility: 'visible',
-              opacity: 1
-            }}
-          >
-            <div
-              className="guest-name"
-              style={{
-                fontFamily: 'Inter, Arial, sans-serif',
-                fontWeight: 800,
-                fontSize: `${nameFontSize}pt`,
-                lineHeight: 1.1,
-                color: '#000000',
-                margin: '0 0 1.5mm 0',
-                visibility: 'visible'
-              }}
-            >
-              {formatNameForBadge(printingStaff.name)}
-            </div>
-            <div
-              className="guest-company"
-              style={{
-                fontFamily: 'Inter, Arial, sans-serif',
-                fontWeight: 500,
-                fontSize: `${companyFontSize}pt`,
-                lineHeight: 1.2,
-                color: '#000000',
-                visibility: 'visible'
-              }}
-            >
-              {printingStaff.role || 'Equipe'}
-            </div>
-          </div>
-        </div>
-      )}
 
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
