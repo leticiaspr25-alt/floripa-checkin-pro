@@ -310,9 +310,17 @@ export default function EventManagement() {
 
   const handleConfirmStaffPrint = () => {
     if (!previewStaff) return;
-    setPrintingStaff(previewStaff);
+    const staffToPrint = previewStaff;
     setPreviewStaff(null);
-    requestAnimationFrame(() => { requestAnimationFrame(() => { window.print(); }); });
+    // Aguarda o modal fechar antes de setar o staff para impressão
+    setTimeout(() => {
+      setPrintingStaff(staffToPrint);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.print();
+        });
+      });
+    }, 100);
   };
 
   const handleOpenPreview = (guest: Guest) => {
@@ -321,13 +329,17 @@ export default function EventManagement() {
 
   const handleConfirmPrint = () => {
     if (!previewGuest) return;
-    setPrintingGuest(previewGuest);
+    const guestToPrint = previewGuest;
     setPreviewGuest(null);
-    requestAnimationFrame(() => {
+    // Aguarda o modal fechar antes de setar o guest para impressão
+    setTimeout(() => {
+      setPrintingGuest(guestToPrint);
       requestAnimationFrame(() => {
-        window.print();
+        requestAnimationFrame(() => {
+          window.print();
+        });
       });
-    });
+    }, 100);
   };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
