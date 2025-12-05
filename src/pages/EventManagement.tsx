@@ -489,59 +489,113 @@ export default function EventManagement() {
           </DialogContent>
         </Dialog>
 
-        {/* MODAL PREVIEW DA ETIQUETA */}
+        {/* MODAL PREVIEW DA ETIQUETA - ESTILO BARTENDER */}
         <Dialog open={!!previewGuest} onOpenChange={(open) => !open && setPreviewGuest(null)}>
-          <DialogContent className="bg-card border-border max-w-md">
-            <DialogHeader><DialogTitle className="flex items-center gap-2"><Printer className="h-5 w-5 text-primary" />Preview da Etiqueta</DialogTitle></DialogHeader>
-            <div className="mt-4 space-y-4">
-              <p className="text-sm text-muted-foreground">Confira como a etiqueta ficará antes de imprimir:</p>
-              
-              {/* PREVIEW VISUAL DA ETIQUETA */}
-              <div className="border-2 border-dashed border-border rounded-lg p-4 bg-white">
-                <div 
-                  className="mx-auto bg-white border border-gray-300 shadow-sm flex flex-col justify-center items-center text-center"
-                  style={{ 
-                    width: '90mm', 
-                    height: '35mm', 
-                    maxWidth: '100%',
-                    aspectRatio: '90 / 35',
-                    padding: '0 3mm',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <div 
-                    className="font-bold text-black truncate w-full"
-                    style={{ 
-                      fontFamily: "'Inter', Arial, sans-serif",
-                      fontWeight: 800,
-                      fontSize: 'clamp(14px, 4vw, 17pt)',
-                      lineHeight: 1.1,
-                      marginBottom: '1.5mm'
+          <DialogContent className="bg-[#2a2a2a] border-[#444] max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-white">
+                <Printer className="h-5 w-5 text-yellow-500" />
+                Preview da Etiqueta
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-2 space-y-4">
+              {/* Área de preview com fundo escuro estilo editor */}
+              <div className="bg-[#1a1a1a] rounded-lg p-6 relative">
+                {/* Régua superior */}
+                <div className="flex justify-between text-[10px] text-gray-500 mb-2 px-1">
+                  <span>0mm</span>
+                  <span>45mm</span>
+                  <span>90mm</span>
+                </div>
+
+                {/* Container da etiqueta com sombra e proporção exata */}
+                <div className="relative mx-auto" style={{ width: '340px', height: '132px' }}>
+                  {/* Sombra da etiqueta */}
+                  <div
+                    className="absolute inset-0 bg-black/30 rounded-sm"
+                    style={{ transform: 'translate(4px, 4px)' }}
+                  />
+
+                  {/* ETIQUETA - Réplica exata da impressão */}
+                  <div
+                    className="relative bg-white rounded-sm overflow-hidden"
+                    style={{
+                      width: '340px',  /* 90mm em escala */
+                      height: '132px', /* 35mm em escala */
+                      boxShadow: '0 0 0 1px rgba(0,0,0,0.1)'
                     }}
                   >
-                    {previewGuest && formatNameForBadge(previewGuest.name)}
-                  </div>
-                  {previewGuest?.company && (
-                    <div 
-                      className="text-black truncate w-full"
-                      style={{ 
-                        fontFamily: "'Inter', Arial, sans-serif",
-                        fontWeight: 500,
-                        fontSize: 'clamp(10px, 2.5vw, 10pt)',
-                        lineHeight: 1.2
-                      }}
+                    {/* Conteúdo centralizado - IDÊNTICO ao print-label */}
+                    <div
+                      className="w-full h-full flex flex-col justify-center items-center text-center"
+                      style={{ padding: '0 11px' }} /* 3mm em escala */
                     >
-                      {previewGuest.company}
+                      {/* Nome - 17pt convertido para escala */}
+                      <div
+                        className="w-full truncate text-black"
+                        style={{
+                          fontFamily: "'Inter', Arial, sans-serif",
+                          fontWeight: 800,
+                          fontSize: '21px', /* 17pt em escala proporcional */
+                          lineHeight: 1.1,
+                          marginBottom: '6px' /* 1.5mm em escala */
+                        }}
+                      >
+                        {previewGuest && formatNameForBadge(previewGuest.name)}
+                      </div>
+
+                      {/* Empresa - 10pt convertido para escala */}
+                      {previewGuest?.company && (
+                        <div
+                          className="w-full truncate text-black"
+                          style={{
+                            fontFamily: "'Inter', Arial, sans-serif",
+                            fontWeight: 500,
+                            fontSize: '12px', /* 10pt em escala proporcional */
+                            lineHeight: 1.2
+                          }}
+                        >
+                          {previewGuest.company}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                </div>
+
+                {/* Régua lateral */}
+                <div className="absolute right-2 top-10 bottom-10 flex flex-col justify-between text-[10px] text-gray-500">
+                  <span>0</span>
+                  <span>17</span>
+                  <span>35mm</span>
                 </div>
               </div>
 
-              <p className="text-xs text-muted-foreground text-center">Tamanho: 90mm × 35mm (Bematech)</p>
+              {/* Info da etiqueta */}
+              <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
+                <span className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  90mm × 35mm
+                </span>
+                <span>Bematech LB-1000</span>
+                <span>Landscape</span>
+              </div>
 
+              {/* Botões */}
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setPreviewGuest(null)}>Cancelar</Button>
-                <Button className="flex-1 bg-primary" onClick={handleConfirmPrint}><Printer className="h-4 w-4 mr-2" />Imprimir</Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-[#555] text-gray-300 hover:bg-[#333] hover:text-white"
+                  onClick={() => setPreviewGuest(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-semibold"
+                  onClick={handleConfirmPrint}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir
+                </Button>
               </div>
             </div>
           </DialogContent>
