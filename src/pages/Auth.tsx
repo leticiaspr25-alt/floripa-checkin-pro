@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, signUp } = useAuth();
   const [loading, setLoading] = useState(false);
   
   // Estados de Visibilidade da Senha
@@ -33,10 +34,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await signIn(email, password);
 
     if (error) {
       toast({ title: "Erro no Login", description: error.message, variant: "destructive" });
@@ -55,46 +53,25 @@ export default function Auth() {
       return;
     }
 
-    // Validação do Código de Acesso
-    // (Em produção, idealmente buscaria do banco, mas aqui mantemos fixo para garantir funcionamento)
-    let role = '';
-    if (accessCode === 'MASTER_FLORIPA') role = 'admin';
-    else if (accessCode === 'EQUIPE_2025') role = 'team';
-    else if (accessCode === 'RECEPCAO_EVENTO') role = 'receptionist';
-    else {
-      // Verifica se o código bate com alguma chave personalizada do banco (Opcional, mas boa prática)
-      // Como não temos essa busca síncrona aqui, vamos confiar nos códigos padrão por enquanto.
-      // Se você quiser que ele valide códigos novos do banco, teríamos que fazer uma query antes.
-      // Mas para o Admin (você) entrar agora, o MASTER_FLORIPA vai funcionar.
-      toast({ title: "Acesso Negado", description: "Código de acesso inválido.", variant: "destructive" });
-      return;
-    }
-
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signUp({
-      email: newEmail,
-      password: newPassword,
-      options: {
-        data: {
-          full_name: newName,
-          role: role,
-        },
-      },
-    });
+    // Use the secure signUp function from useAuth that validates access codes from the database
+    const { error } = await signUp(newEmail, newPassword, newName, accessCode);
 
     if (error) {
       toast({ title: "Erro no Cadastro", description: error.message, variant: "destructive" });
+      setLoading(false);
     } else {
       toast({ title: "Sucesso!", description: "Conta criada. Entrando..." });
-      if (data.session) {
+      // Auto-login after signup
+      const { error: loginError } = await signIn(newEmail, newPassword);
+      if (!loginError) {
         navigate('/dashboard');
       } else {
-        const { error: loginError } = await supabase.auth.signInWithPassword({ email: newEmail, password: newPassword });
-        if (!loginError) navigate('/dashboard');
+        toast({ title: "Conta criada", description: "Faça login para continuar." });
+        setLoading(false);
       }
     }
-    setLoading(false);
   };
 
   return (
