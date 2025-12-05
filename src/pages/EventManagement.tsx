@@ -516,6 +516,24 @@ export default function EventManagement() {
             background-color: ${eventColor}20 !important;
             color: ${eventColor} !important;
           }
+          .event-tabs .bg-primary {
+            background-color: ${eventColor} !important;
+          }
+          .event-tabs .bg-primary:hover {
+            background-color: ${eventColor}dd !important;
+          }
+          .event-tabs .text-primary {
+            color: ${eventColor} !important;
+          }
+          .event-tabs .border-primary {
+            border-color: ${eventColor} !important;
+          }
+          .event-tabs .hover\\:border-primary:hover {
+            border-color: ${eventColor} !important;
+          }
+          .event-tabs .hover\\:bg-primary\\/5:hover {
+            background-color: ${eventColor}10 !important;
+          }
         `}</style>
 
         <Tabs defaultValue="guests" className="space-y-6 event-tabs" onValueChange={(v) => { if(v === 'history') fetchActivityLogs(); }}>
@@ -580,7 +598,7 @@ export default function EventManagement() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
                       <h3 className="font-semibold text-foreground truncate">{s.name}</h3>
-                      <Badge className="bg-orange-500 text-white">Equipe</Badge>
+                      <Badge style={{ backgroundColor: eventColor }} className="text-white">Equipe</Badge>
                       {s.checked_in && <Badge style={{ backgroundColor: eventColor }} className="text-white">Presente</Badge>}
                     </div>
                     {s.role && <p className="text-sm text-muted-foreground mt-1 truncate">{s.role}</p>}
@@ -823,7 +841,7 @@ export default function EventManagement() {
           <DialogContent className="bg-[#1e1e1e] border-[#333] max-w-xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-white">
-                <Printer className="h-5 w-5 text-yellow-500" />
+                <Printer className="h-5 w-5" style={{ color: eventColor }} />
                 Preview da Etiqueta
               </DialogTitle>
             </DialogHeader>
@@ -916,7 +934,7 @@ export default function EventManagement() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-400">Nome</span>
-                    <span className="text-xs text-yellow-500 font-mono">{nameFontSize}pt</span>
+                    <span className="text-xs font-mono" style={{ color: eventColor }}>{nameFontSize}pt</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -950,7 +968,7 @@ export default function EventManagement() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-400">Empresa</span>
-                    <span className="text-xs text-yellow-500 font-mono">{companyFontSize}pt</span>
+                    <span className="text-xs font-mono" style={{ color: eventColor }}>{companyFontSize}pt</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -991,7 +1009,8 @@ export default function EventManagement() {
                   Cancelar
                 </Button>
                 <Button
-                  className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-black font-semibold"
+                  className="flex-1 text-white font-semibold"
+                  style={{ backgroundColor: eventColor }}
                   onClick={handleConfirmPrint}
                 >
                   <Printer className="h-4 w-4 mr-2" />
@@ -1007,7 +1026,7 @@ export default function EventManagement() {
           <DialogContent className="bg-[#1e1e1e] border-[#333] max-w-xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-white">
-                <HardHat className="h-5 w-5 text-orange-500" />
+                <HardHat className="h-5 w-5" style={{ color: eventColor }} />
                 Preview da Etiqueta - Equipe
               </DialogTitle>
             </DialogHeader>
@@ -1034,7 +1053,7 @@ export default function EventManagement() {
                   </div>
                 </div>
                 <div className="flex justify-center gap-3 mt-2 text-[10px] text-gray-500">
-                  <span className="text-orange-500">Equipe</span>
+                  <span style={{ color: eventColor }}>Equipe</span>
                   <span>•</span>
                   <span>90mm × 35mm</span>
                 </div>
@@ -1049,7 +1068,7 @@ export default function EventManagement() {
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Nome</span><span className="text-xs text-orange-500 font-mono">{nameFontSize}pt</span></div>
+                  <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Nome</span><span className="text-xs font-mono" style={{ color: eventColor }}>{nameFontSize}pt</span></div>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="icon" className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]" onClick={() => setNameFontSize(Math.max(10, nameFontSize - 1))}><Minus className="h-3 w-3" /></Button>
                     <Slider value={[nameFontSize]} onValueChange={(v) => setNameFontSize(v[0])} min={10} max={28} step={1} className="flex-1" />
@@ -1057,7 +1076,7 @@ export default function EventManagement() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Função</span><span className="text-xs text-orange-500 font-mono">{companyFontSize}pt</span></div>
+                  <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Função</span><span className="text-xs font-mono" style={{ color: eventColor }}>{companyFontSize}pt</span></div>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="icon" className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]" onClick={() => setCompanyFontSize(Math.max(6, companyFontSize - 1))}><Minus className="h-3 w-3" /></Button>
                     <Slider value={[companyFontSize]} onValueChange={(v) => setCompanyFontSize(v[0])} min={6} max={18} step={1} className="flex-1" />
@@ -1068,7 +1087,7 @@ export default function EventManagement() {
 
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1 border-[#444] text-gray-300 hover:bg-[#333] hover:text-white" onClick={() => setPreviewStaff(null)}>Cancelar</Button>
-                <Button className="flex-1 bg-orange-500 hover:bg-orange-400 text-white font-semibold" onClick={handleConfirmStaffPrint}><Printer className="h-4 w-4 mr-2" />Imprimir</Button>
+                <Button className="flex-1 text-white font-semibold" style={{ backgroundColor: eventColor }} onClick={handleConfirmStaffPrint}><Printer className="h-4 w-4 mr-2" />Imprimir</Button>
               </div>
             </div>
           </DialogContent>
