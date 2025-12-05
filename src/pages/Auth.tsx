@@ -77,9 +77,17 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-black p-4">
       <Card className="w-full max-w-md bg-[#1A1A1A] border-[#333] text-white">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center text-[#f37021]">Floripa Event Manager</CardTitle>
-          <CardDescription className="text-center text-gray-400">Acesse o sistema para gerenciar</CardDescription>
+        <CardHeader className="text-center space-y-4">
+          {/* Logo da Empresa */}
+          <div className="flex justify-center">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#f37021] to-[#ff8c42] flex items-center justify-center shadow-lg shadow-orange-500/20">
+              <span className="text-3xl font-black text-white">RF</span>
+            </div>
+          </div>
+          <div>
+            <CardTitle className="text-2xl font-bold text-[#f37021]">Rooftop Floripa Square</CardTitle>
+            <CardDescription className="text-gray-400">Sistema de Check-in e Gestão de Eventos</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">

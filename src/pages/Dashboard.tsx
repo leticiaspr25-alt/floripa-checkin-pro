@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Calendar, LogOut, Loader2, Users, KeyRound, Shield } from 'lucide-react';
+import { Plus, Calendar, LogOut, Loader2, Users, KeyRound, Shield, Building2, Image as ImageIcon, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,12 @@ interface Event {
   created_at: string;
 }
 
+interface CompanySettings {
+  name: string;
+  logo_url: string | null;
+  primary_color: string;
+}
+
 export default function Dashboard() {
   const { user, signOut, loading: authLoading, role, isAdmin, isRecepcao } = useAuth();
   const navigate = useNavigate();
@@ -33,6 +39,12 @@ export default function Dashboard() {
   const [newEventName, setNewEventName] = useState('');
   const [newEventDate, setNewEventDate] = useState('');
   const [creating, setCreating] = useState(false);
+  const [companySettings, setCompanySettings] = useState<CompanySettings>({
+    name: 'Rooftop Floripa Square',
+    logo_url: null,
+    primary_color: '#f37021'
+  });
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -43,8 +55,45 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       fetchEvents();
+      fetchCompanySettings();
     }
   }, [user]);
+
+  const fetchCompanySettings = async () => {
+    const { data } = await supabase.from('company_settings').select('*').eq('id', 1).single();
+    if (data) {
+      setCompanySettings({
+        name: data.name || 'Rooftop Floripa Square',
+        logo_url: data.logo_url,
+        primary_color: data.primary_color || '#f37021'
+      });
+    }
+  };
+
+  const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `company-logo-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('event-images').upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
+
+      await supabase.from('company_settings').update({ logo_url: data.publicUrl }).eq('id', 1);
+
+      setCompanySettings(prev => ({ ...prev, logo_url: data.publicUrl }));
+      toast({ title: 'Sucesso', description: 'Logo atualizada!' });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Falha ao enviar logo.', variant: 'destructive' });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const fetchEvents = async () => {
     // CORREÇÃO: Removemos o filtro .eq('user_id', user.id) para mostrar TODOS os eventos
@@ -121,8 +170,15 @@ export default function Dashboard() {
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary" />
-            <span className="font-semibold text-lg text-foreground">Floripa Square</span>
+            {/* Logo da Empresa */}
+            {companySettings.logo_url ? (
+              <img src={companySettings.logo_url} alt="Logo" className="w-10 h-10 rounded-lg object-contain bg-white p-1" />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#f37021] to-[#ff8c42] flex items-center justify-center">
+                <span className="text-sm font-black text-white">RF</span>
+              </div>
+            )}
+            <span className="font-semibold text-lg text-foreground">{companySettings.name}</span>
             {getRoleBadge()}
           </div>
           <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
@@ -147,6 +203,10 @@ export default function Dashboard() {
               <TabsTrigger value="access" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <KeyRound className="h-4 w-4 mr-2" />
                 Chaves de Acesso
+              </TabsTrigger>
+              <TabsTrigger value="company" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Building2 className="h-4 w-4 mr-2" />
+                Empresa
               </TabsTrigger>
             </TabsList>
 
@@ -176,6 +236,84 @@ export default function Dashboard() {
             <TabsContent value="access">
               <div className="bg-card border border-border rounded-xl p-6">
                 <AccessCodeManagement />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="company">
+              <div className="bg-card border border-border rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-semibold text-foreground">Configurações da Empresa</h3>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Logo da Empresa */}
+                  <div className="space-y-4">
+                    <Label className="text-foreground font-medium">Logo da Empresa</Label>
+                    <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary transition-colors">
+                      {companySettings.logo_url ? (
+                        <div className="space-y-4">
+                          <img
+                            src={companySettings.logo_url}
+                            alt="Logo"
+                            className="w-32 h-32 mx-auto object-contain bg-white rounded-xl p-2 shadow-lg"
+                          />
+                          <label className="cursor-pointer">
+                            <input type="file" accept="image/*" onChange={handleUploadLogo} className="hidden" />
+                            <Button variant="outline" className="border-border" asChild disabled={uploadingLogo}>
+                              <span>
+                                {uploadingLogo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                                Trocar Logo
+                              </span>
+                            </Button>
+                          </label>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer block">
+                          <input type="file" accept="image/*" onChange={handleUploadLogo} className="hidden" />
+                          <div className="space-y-3">
+                            <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-[#f37021] to-[#ff8c42] flex items-center justify-center">
+                              <span className="text-2xl font-black text-white">RF</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">Clique para enviar a logo</p>
+                            <Button variant="outline" className="border-border" asChild disabled={uploadingLogo}>
+                              <span>
+                                {uploadingLogo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+                                Selecionar Imagem
+                              </span>
+                            </Button>
+                          </div>
+                        </label>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Recomendado: PNG ou SVG com fundo transparente</p>
+                  </div>
+
+                  {/* Info da Empresa */}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-foreground font-medium">Nome da Empresa</Label>
+                      <div className="bg-secondary/50 border border-border rounded-lg p-3">
+                        <span className="text-foreground font-semibold">{companySettings.name}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-foreground font-medium">Cor Principal</Label>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-lg shadow-inner"
+                          style={{ backgroundColor: companySettings.primary_color }}
+                        />
+                        <span className="font-mono text-sm text-muted-foreground">{companySettings.primary_color}</span>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-border">
+                      <p className="text-xs text-muted-foreground">
+                        A logo aparecerá no header do sistema. Para alterar o nome ou cor, edite diretamente no banco de dados (Supabase).
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
