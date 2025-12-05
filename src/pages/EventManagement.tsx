@@ -377,8 +377,9 @@ export default function EventManagement() {
 
   const formatLogTime = (ts: string) => new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-  // Cor do evento (usa laranja padrão se não tiver)
+  // Cores do evento
   const eventColor = eventSettings.primary_color || '#f37021';
+  const secondaryColor = eventSettings.secondary_color || eventColor; // Fallback para primária
 
   if (authLoading || loading) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
@@ -499,7 +500,7 @@ export default function EventManagement() {
       </header>
 
       <main className="container mx-auto px-4 py-6 print:hidden">
-        {/* CSS dinâmico para cor do evento - APENAS nas tabs */}
+        {/* CSS dinâmico para cores do evento */}
         <style>{`
           .event-tabs [role="tablist"] button[data-state="active"] {
             background-color: ${eventColor} !important;
@@ -507,6 +508,9 @@ export default function EventManagement() {
           }
           .event-tabs [role="tablist"] button[data-state="active"]:hover {
             background-color: ${eventColor} !important;
+          }
+          .event-tabs button[role="switch"][data-state="checked"] {
+            background-color: ${secondaryColor} !important;
           }
         `}</style>
 
