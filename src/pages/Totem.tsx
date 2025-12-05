@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Monitor } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 interface EventData {
   name: string;
   event_logo_url: string | null;
   primary_color: string | null;
+  event_logo_size: number | null;
 }
 
 export default function Totem() {
@@ -14,7 +15,8 @@ export default function Totem() {
   const [eventData, setEventData] = useState<EventData>({
     name: "",
     event_logo_url: null,
-    primary_color: "#f37021"
+    primary_color: "#f37021",
+    event_logo_size: 200
   });
 
   useEffect(() => {
@@ -22,14 +24,15 @@ export default function Totem() {
       if (!id) return;
       const { data } = await supabase
         .from("events")
-        .select("name, event_logo_url, primary_color")
+        .select("name, event_logo_url, primary_color, event_logo_size")
         .eq("id", id)
         .single();
       if (data) {
         setEventData({
           name: data.name,
           event_logo_url: data.event_logo_url,
-          primary_color: data.primary_color || "#f37021"
+          primary_color: data.primary_color || "#f37021",
+          event_logo_size: data.event_logo_size || 200
         });
       }
     }
@@ -37,35 +40,26 @@ export default function Totem() {
   }, [id]);
 
   const primaryColor = eventData.primary_color || "#f37021";
+  const logoSize = eventData.event_logo_size || 200;
 
   return (
     <div className="h-screen bg-black flex flex-col items-center justify-center p-8 text-center animate-fade-in">
-      {/* Logo do Evento ou Ícone Padrão */}
-      {eventData.event_logo_url ? (
-        <div className="mb-8">
-          <img
-            src={eventData.event_logo_url}
-            alt="Logo do Evento"
-            className="w-32 h-32 object-contain"
-          />
-        </div>
-      ) : (
-        <div
-          className="mb-8 p-4 rounded-full animate-bounce"
-          style={{ backgroundColor: `${primaryColor}20` }}
-        >
-          <Monitor size={40} style={{ color: primaryColor }} />
-        </div>
-      )}
+      {/* Setinha com cor primária do evento */}
+      <div
+        className="mb-6 animate-bounce"
+        style={{ color: primaryColor }}
+      >
+        <ChevronDown size={60} strokeWidth={3} />
+      </div>
 
       {/* QR Code com sombra colorida */}
       <div
-        className="bg-white p-6 rounded-3xl mb-12 transform hover:scale-105 transition-transform duration-500"
+        className="bg-white p-6 rounded-3xl mb-10 transform hover:scale-105 transition-transform duration-500"
         style={{ boxShadow: `0 0 120px ${primaryColor}50` }}
       >
         <img
-          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + '/guest/' + id)}`}
-          className="w-[250px] h-[250px]"
+          src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(window.location.origin + '/guest/' + id)}`}
+          className="w-[280px] h-[280px]"
           alt="QR Check-in"
         />
       </div>
@@ -78,9 +72,25 @@ export default function Totem() {
         style={{ backgroundColor: primaryColor }}
       />
 
-      <p className="text-3xl text-gray-400 font-light">{eventData.name}</p>
+      {/* Logo do Evento (grande) ou nome como fallback */}
+      {eventData.event_logo_url ? (
+        <div className="mt-4">
+          <img
+            src={eventData.event_logo_url}
+            alt="Logo do Evento"
+            style={{
+              width: `${logoSize * 1.5}px`,
+              height: 'auto',
+              maxHeight: '180px',
+              objectFit: 'contain'
+            }}
+          />
+        </div>
+      ) : (
+        <p className="text-3xl text-gray-400 font-light">{eventData.name}</p>
+      )}
 
-      <div className="mt-16 flex items-center gap-3 text-gray-600">
+      <div className="mt-12 flex items-center gap-3 text-gray-600">
         <span className="text-sm uppercase tracking-widest font-bold">
           Aponte a câmera do seu celular
         </span>
