@@ -31,6 +31,8 @@ interface Event {
   photo_img_url: string | null;
   event_logo_url: string | null;
   primary_color: string | null;
+  secondary_color: string | null;
+  tertiary_color: string | null;
 }
 
 interface Guest {
@@ -173,7 +175,7 @@ export default function EventManagement() {
 
   const [eventSettings, setEventSettings] = useState({
     name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: '',
-    event_logo_url: '', primary_color: '#f37021'
+    event_logo_url: '', primary_color: '#f37021', secondary_color: '', tertiary_color: ''
   });
 
   const canImportExport = isAdmin || isEquipe;
@@ -204,7 +206,8 @@ export default function EventManagement() {
         name: data.name, date: new Date(data.date).toISOString().slice(0, 16),
         wifi_ssid: data.wifi_ssid || '', wifi_pass: data.wifi_pass || '',
         photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', photo_img_url: data.photo_img_url || '',
-        event_logo_url: data.event_logo_url || '', primary_color: data.primary_color || '#f37021'
+        event_logo_url: data.event_logo_url || '', primary_color: data.primary_color || '#f37021',
+        secondary_color: data.secondary_color || '', tertiary_color: data.tertiary_color || ''
       });
     }
     setLoading(false);
@@ -354,7 +357,8 @@ export default function EventManagement() {
       name: eventSettings.name, date: new Date(eventSettings.date).toISOString(),
       wifi_ssid: eventSettings.wifi_ssid || null, wifi_pass: eventSettings.wifi_pass || null,
       photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null, photo_img_url: eventSettings.photo_img_url || null,
-      event_logo_url: eventSettings.event_logo_url || null, primary_color: eventSettings.primary_color || '#f37021'
+      event_logo_url: eventSettings.event_logo_url || null, primary_color: eventSettings.primary_color || '#f37021',
+      secondary_color: eventSettings.secondary_color || null, tertiary_color: eventSettings.tertiary_color || null
     }).eq('id', id);
     if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Salvo!' }); await logActivity('Atualizou configurações', 'Alterações salvas'); fetchEvent(); }
     setSaving(false);
@@ -369,6 +373,9 @@ export default function EventManagement() {
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const formatLogTime = (ts: string) => new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+  // Cor do evento (usa laranja padrão se não tiver)
+  const eventColor = eventSettings.primary_color || '#f37021';
 
   if (authLoading || loading) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
@@ -489,18 +496,29 @@ export default function EventManagement() {
       </header>
 
       <main className="container mx-auto px-4 py-6 print:hidden">
-        <Tabs defaultValue="guests" className="space-y-6" onValueChange={(v) => { if(v === 'history') fetchActivityLogs(); }}>
+        {/* CSS dinâmico para cor do evento */}
+        <style>{`
+          .event-tabs [data-state="active"] {
+            background-color: ${eventColor} !important;
+            color: white !important;
+          }
+          .event-tabs [data-state="active"]:hover {
+            background-color: ${eventColor} !important;
+          }
+        `}</style>
+
+        <Tabs defaultValue="guests" className="space-y-6 event-tabs" onValueChange={(v) => { if(v === 'history') fetchActivityLogs(); }}>
           <TabsList className="bg-card border border-border">
-            <TabsTrigger value="guests" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Convidados</TabsTrigger>
-            <TabsTrigger value="staff" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Equipe</TabsTrigger>
-            {canAccessHistory && <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Histórico</TabsTrigger>}
-            {canAccessSettings && <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Configurações</TabsTrigger>}
+            <TabsTrigger value="guests">Convidados</TabsTrigger>
+            <TabsTrigger value="staff">Equipe</TabsTrigger>
+            {canAccessHistory && <TabsTrigger value="history">Histórico</TabsTrigger>}
+            {canAccessSettings && <TabsTrigger value="settings">Configurações</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold text-primary">{guests.length}</p></div>
-              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold text-primary">{guests.filter(g=>g.checked_in).length}</p></div>
+              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.length}</p></div>
+              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.filter(g=>g.checked_in).length}</p></div>
             </div>
             <div className="flex flex-wrap gap-3 items-center">
               <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar convidado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-card border-border" /></div>
@@ -517,11 +535,11 @@ export default function EventManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-card border border-border rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2"><HardHat className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total Equipe</span></div>
-                <p className="text-5xl font-bold text-primary">{staff.length}</p>
+                <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.length}</p>
               </div>
               <div className="bg-card border border-border rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div>
-                <p className="text-5xl font-bold text-primary">{staff.filter(s => s.checked_in).length}</p>
+                <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.filter(s => s.checked_in).length}</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-3 items-center">
@@ -593,43 +611,108 @@ export default function EventManagement() {
                     <ImageIcon className="h-5 w-5 text-primary" />
                     Identidade Visual do Evento
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Logo do Evento */}
-                    <div className="space-y-3">
-                      <Label>Logo do Evento</Label>
+                  {/* Logo do Evento */}
+                  <div className="space-y-3 mb-6">
+                    <Label>Logo do Evento</Label>
+                    <div className="max-w-xs">
                       <UploadBox
                         label="Logo do Evento"
                         icon="image"
                         previewUrl={eventSettings.event_logo_url}
                         onUpload={(url) => setEventSettings({...eventSettings, event_logo_url: url})}
                       />
-                      <p className="text-xs text-muted-foreground">Aparecerá no Totem e na TV</p>
                     </div>
-                    {/* Cor Principal */}
-                    <div className="space-y-3">
-                      <Label>Cor Principal do Evento</Label>
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="color"
-                          value={eventSettings.primary_color}
-                          onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
-                          className="w-16 h-16 rounded-lg cursor-pointer border-2 border-border"
-                        />
-                        <div className="flex-1">
-                          <Input
-                            value={eventSettings.primary_color}
-                            onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
-                            className="bg-card border-border font-mono"
-                            placeholder="#f37021"
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">Código hexadecimal da cor</p>
+                    <p className="text-xs text-muted-foreground">Aparecerá no Totem e na TV</p>
+                  </div>
+
+                  {/* Cores do Evento - 3 cores */}
+                  <div className="space-y-4">
+                      <Label>Paleta de Cores do Evento (até 3 cores)</Label>
+                      <p className="text-xs text-muted-foreground">Defina as cores que representam a identidade visual do evento</p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Cor Principal */}
+                        <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-foreground">Cor Principal</span>
+                            <span className="text-xs text-muted-foreground">Obrigatória</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={eventSettings.primary_color}
+                              onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
+                              className="w-12 h-12 rounded-lg cursor-pointer border-2 border-border"
+                            />
+                            <Input
+                              value={eventSettings.primary_color}
+                              onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
+                              className="bg-card border-border font-mono text-sm flex-1"
+                              placeholder="#f37021"
+                            />
+                          </div>
+                          <div className="h-3 rounded-full" style={{ backgroundColor: eventSettings.primary_color }} />
+                        </div>
+
+                        {/* Cor Secundária */}
+                        <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-foreground">Cor Secundária</span>
+                            <span className="text-xs text-muted-foreground">Opcional</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={eventSettings.secondary_color || '#888888'}
+                              onChange={e => setEventSettings({...eventSettings, secondary_color: e.target.value})}
+                              className="w-12 h-12 rounded-lg cursor-pointer border-2 border-border"
+                            />
+                            <Input
+                              value={eventSettings.secondary_color}
+                              onChange={e => setEventSettings({...eventSettings, secondary_color: e.target.value})}
+                              className="bg-card border-border font-mono text-sm flex-1"
+                              placeholder="#888888"
+                            />
+                          </div>
+                          <div className="h-3 rounded-full" style={{ backgroundColor: eventSettings.secondary_color || '#444' }} />
+                        </div>
+
+                        {/* Cor Terciária */}
+                        <div className="bg-secondary/30 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-foreground">Cor Terciária</span>
+                            <span className="text-xs text-muted-foreground">Opcional</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={eventSettings.tertiary_color || '#cccccc'}
+                              onChange={e => setEventSettings({...eventSettings, tertiary_color: e.target.value})}
+                              className="w-12 h-12 rounded-lg cursor-pointer border-2 border-border"
+                            />
+                            <Input
+                              value={eventSettings.tertiary_color}
+                              onChange={e => setEventSettings({...eventSettings, tertiary_color: e.target.value})}
+                              className="bg-card border-border font-mono text-sm flex-1"
+                              placeholder="#cccccc"
+                            />
+                          </div>
+                          <div className="h-3 rounded-full" style={{ backgroundColor: eventSettings.tertiary_color || '#666' }} />
                         </div>
                       </div>
-                      {/* Preview da cor */}
-                      <div className="flex gap-2 mt-2">
-                        <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color }} />
-                        <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color, opacity: 0.5 }} />
-                        <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color, opacity: 0.2 }} />
+
+                      {/* Preview combinado das 3 cores */}
+                      <div className="mt-4 p-4 bg-black/20 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Preview da paleta:</p>
+                        <div className="flex gap-2 h-10">
+                          <div className="flex-[3] rounded-lg" style={{ backgroundColor: eventSettings.primary_color }} />
+                          {eventSettings.secondary_color && (
+                            <div className="flex-[2] rounded-lg" style={{ backgroundColor: eventSettings.secondary_color }} />
+                          )}
+                          {eventSettings.tertiary_color && (
+                            <div className="flex-1 rounded-lg" style={{ backgroundColor: eventSettings.tertiary_color }} />
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
