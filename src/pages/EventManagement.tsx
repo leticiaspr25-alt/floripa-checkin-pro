@@ -29,6 +29,8 @@ interface Event {
   wifi_img_url: string | null;
   photo_url: string | null;
   photo_img_url: string | null;
+  event_logo_url: string | null;
+  primary_color: string | null;
 }
 
 interface Guest {
@@ -170,7 +172,8 @@ export default function EventManagement() {
   const [printingStaff, setPrintingStaff] = useState<Staff | null>(null);
 
   const [eventSettings, setEventSettings] = useState({
-    name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: ''
+    name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: '',
+    event_logo_url: '', primary_color: '#f37021'
   });
 
   const canImportExport = isAdmin || isEquipe;
@@ -194,13 +197,14 @@ export default function EventManagement() {
 
   const fetchEvent = async () => {
     const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
-    if (error || !data) { toast({ title: 'Erro', description: 'Evento não encontrado.', variant: 'destructive' }); navigate('/dashboard'); } 
+    if (error || !data) { toast({ title: 'Erro', description: 'Evento não encontrado.', variant: 'destructive' }); navigate('/dashboard'); }
     else {
       setEvent(data);
       setEventSettings({
         name: data.name, date: new Date(data.date).toISOString().slice(0, 16),
         wifi_ssid: data.wifi_ssid || '', wifi_pass: data.wifi_pass || '',
-        photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', photo_img_url: data.photo_img_url || ''
+        photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', photo_img_url: data.photo_img_url || '',
+        event_logo_url: data.event_logo_url || '', primary_color: data.primary_color || '#f37021'
       });
     }
     setLoading(false);
@@ -349,7 +353,8 @@ export default function EventManagement() {
     const { error } = await supabase.from('events').update({
       name: eventSettings.name, date: new Date(eventSettings.date).toISOString(),
       wifi_ssid: eventSettings.wifi_ssid || null, wifi_pass: eventSettings.wifi_pass || null,
-      photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null, photo_img_url: eventSettings.photo_img_url || null
+      photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null, photo_img_url: eventSettings.photo_img_url || null,
+      event_logo_url: eventSettings.event_logo_url || null, primary_color: eventSettings.primary_color || '#f37021'
     }).eq('id', id);
     if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Salvo!' }); await logActivity('Atualizou configurações', 'Alterações salvas'); fetchEvent(); }
     setSaving(false);
@@ -582,6 +587,54 @@ export default function EventManagement() {
           {canAccessSettings && (
             <TabsContent value="settings" className="space-y-6 animate-fade-in">
               <form onSubmit={handleSaveSettings} className="space-y-8">
+                {/* BRANDING DO EVENTO */}
+                <div className="bg-card border border-border rounded-xl p-6">
+                  <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5 text-primary" />
+                    Identidade Visual do Evento
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Logo do Evento */}
+                    <div className="space-y-3">
+                      <Label>Logo do Evento</Label>
+                      <UploadBox
+                        label="Logo do Evento"
+                        icon="image"
+                        previewUrl={eventSettings.event_logo_url}
+                        onUpload={(url) => setEventSettings({...eventSettings, event_logo_url: url})}
+                      />
+                      <p className="text-xs text-muted-foreground">Aparecerá no Totem e na TV</p>
+                    </div>
+                    {/* Cor Principal */}
+                    <div className="space-y-3">
+                      <Label>Cor Principal do Evento</Label>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="color"
+                          value={eventSettings.primary_color}
+                          onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
+                          className="w-16 h-16 rounded-lg cursor-pointer border-2 border-border"
+                        />
+                        <div className="flex-1">
+                          <Input
+                            value={eventSettings.primary_color}
+                            onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
+                            className="bg-card border-border font-mono"
+                            placeholder="#f37021"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Código hexadecimal da cor</p>
+                        </div>
+                      </div>
+                      {/* Preview da cor */}
+                      <div className="flex gap-2 mt-2">
+                        <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color }} />
+                        <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color, opacity: 0.5 }} />
+                        <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color, opacity: 0.2 }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2"><Label>Nome do Evento</Label><Input value={eventSettings.name} onChange={e=>setEventSettings({...eventSettings, name: e.target.value})} className="bg-card border-border" /></div>
                   <div className="space-y-2"><Label>Data</Label><Input type="datetime-local" value={eventSettings.date} onChange={e=>setEventSettings({...eventSettings, date: e.target.value})} className="bg-card border-border" /></div>

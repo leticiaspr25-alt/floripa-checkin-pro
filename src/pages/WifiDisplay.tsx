@@ -10,6 +10,8 @@ interface EventData {
   wifi_img_url: string | null;
   photo_url: string | null;
   photo_img_url: string | null;
+  event_logo_url: string | null;
+  primary_color: string | null;
 }
 
 export default function WifiDisplay() {
@@ -28,6 +30,8 @@ export default function WifiDisplay() {
   }, [id]);
 
   if (!event) return <div className="h-screen bg-black flex items-center justify-center text-white">Carregando...</div>;
+
+  const primaryColor = event.primary_color || "#f37021";
 
   // 1. CELULAR (Visualiza Arte Vertical OU QR Codes se não tiver arte)
   if (isMobileView) {
@@ -52,13 +56,47 @@ export default function WifiDisplay() {
   // Layout Padrão (Split Screen)
   return (
     <div className="h-screen bg-black flex flex-col justify-between p-12 border-[20px] border-[#111] overflow-hidden">
-      <div className="text-center pt-8"><h1 className="text-6xl font-black text-white tracking-tight uppercase">Conecte-se & Compartilhe</h1><p className="text-xl text-gray-500 mt-4 tracking-widest uppercase">{event.name}</p></div>
-      <div className="flex flex-row items-center justify-center gap-32">
-        <div className="flex flex-col items-center"><div className="bg-white p-4 rounded-3xl mb-8 transform scale-110 shadow-[0_0_20px_rgba(243,112,33,0.3)]"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=WIFI:S:${event.wifi_ssid};T:WPA;P:${event.wifi_pass};;`} className="w-64 h-64 object-contain" /></div><div className="flex gap-3 text-[#f37021]"><Wifi size={32} /><span className="text-2xl font-bold">WI-FI GRÁTIS</span></div></div>
-        <div className="h-64 w-px bg-gradient-to-b from-transparent via-gray-700 to-transparent"></div>
-        <div className="flex flex-col items-center"><div className="bg-white p-4 rounded-3xl mb-8 transform scale-110 shadow-[0_0_20px_rgba(243,112,33,0.3)]"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(event.photo_url || '#')}`} className="w-64 h-64" /></div><div className="flex gap-3 text-white"><ExternalLink size={32} /><span className="text-2xl font-bold">GALERIA DE FOTOS</span></div></div>
+      {/* Header com logo do evento */}
+      <div className="text-center pt-8">
+        {event.event_logo_url && (
+          <img src={event.event_logo_url} alt="Logo" className="w-24 h-24 mx-auto mb-4 object-contain" />
+        )}
+        <h1 className="text-6xl font-black text-white tracking-tight uppercase">Conecte-se & Compartilhe</h1>
+        <p className="text-xl text-gray-500 mt-4 tracking-widest uppercase">{event.name}</p>
       </div>
-      <div className="bg-[#1A1A1A] rounded-2xl border border-gray-800 p-8 flex justify-around items-center shadow-2xl"><div className="text-center w-1/2 border-r border-gray-700"><p className="text-gray-500 text-xs uppercase tracking-[0.2em] mb-2 font-bold">REDE / NETWORK</p><p className="text-5xl font-bold text-white tracking-tight">{event.wifi_ssid || '---'}</p></div><div className="text-center w-1/2"><p className="text-gray-500 text-xs uppercase tracking-[0.2em] mb-2 font-bold">SENHA / PASSWORD</p><p className="text-5xl font-mono font-bold text-[#f37021] tracking-widest">{event.wifi_pass || '---'}</p></div></div>
+
+      <div className="flex flex-row items-center justify-center gap-32">
+        <div className="flex flex-col items-center">
+          <div className="bg-white p-4 rounded-3xl mb-8 transform scale-110" style={{ boxShadow: `0 0 20px ${primaryColor}50` }}>
+            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=WIFI:S:${event.wifi_ssid};T:WPA;P:${event.wifi_pass};;`} className="w-64 h-64 object-contain" />
+          </div>
+          <div className="flex gap-3" style={{ color: primaryColor }}>
+            <Wifi size={32} />
+            <span className="text-2xl font-bold">WI-FI GRÁTIS</span>
+          </div>
+        </div>
+        <div className="h-64 w-px bg-gradient-to-b from-transparent via-gray-700 to-transparent"></div>
+        <div className="flex flex-col items-center">
+          <div className="bg-white p-4 rounded-3xl mb-8 transform scale-110" style={{ boxShadow: `0 0 20px ${primaryColor}50` }}>
+            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(event.photo_url || '#')}`} className="w-64 h-64" />
+          </div>
+          <div className="flex gap-3 text-white">
+            <ExternalLink size={32} />
+            <span className="text-2xl font-bold">GALERIA DE FOTOS</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-[#1A1A1A] rounded-2xl border border-gray-800 p-8 flex justify-around items-center shadow-2xl">
+        <div className="text-center w-1/2 border-r border-gray-700">
+          <p className="text-gray-500 text-xs uppercase tracking-[0.2em] mb-2 font-bold">REDE / NETWORK</p>
+          <p className="text-5xl font-bold text-white tracking-tight">{event.wifi_ssid || '---'}</p>
+        </div>
+        <div className="text-center w-1/2">
+          <p className="text-gray-500 text-xs uppercase tracking-[0.2em] mb-2 font-bold">SENHA / PASSWORD</p>
+          <p className="text-5xl font-mono font-bold tracking-widest" style={{ color: primaryColor }}>{event.wifi_pass || '---'}</p>
+        </div>
+      </div>
     </div>
   );
 }
