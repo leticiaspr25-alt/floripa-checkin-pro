@@ -520,8 +520,8 @@ export default function EventManagement() {
 
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card border border-border rounded-xl p-6" style={{ borderBottomWidth: '4px', borderBottomColor: eventColor }}><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.length}</p></div>
-              <div className="bg-card border border-border rounded-xl p-6" style={{ borderBottomWidth: '4px', borderBottomColor: eventColor }}><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.filter(g=>g.checked_in).length}</p></div>
+              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.length}</p></div>
+              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.filter(g=>g.checked_in).length}</p></div>
             </div>
             <div className="flex flex-wrap gap-3 items-center">
               <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar convidado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-card border-border" /></div>
@@ -529,18 +529,18 @@ export default function EventManagement() {
               <Dialog open={addGuestOpen} onOpenChange={setAddGuestOpen}><DialogTrigger asChild><Button variant="outline" className="border-border"><Plus className="h-4 w-4 mr-2" />Manual</Button></DialogTrigger><DialogContent className="bg-card border-border"><DialogHeader><DialogTitle>Adicionar Convidado</DialogTitle></DialogHeader><form onSubmit={handleAddGuest} className="space-y-4 mt-4"><Input placeholder="Nome" value={newGuest.name} onChange={e=>setNewGuest({...newGuest, name: e.target.value})} required className="bg-secondary border-border" /><Input placeholder="Empresa" value={newGuest.company} onChange={e=>setNewGuest({...newGuest, company: e.target.value})} className="bg-secondary border-border" /><Input placeholder="Cargo" value={newGuest.role} onChange={e=>setNewGuest({...newGuest, role: e.target.value})} className="bg-secondary border-border" /><Button type="submit" className="w-full bg-primary" disabled={adding}>Adicionar</Button></form></DialogContent></Dialog>
             </div>
             <div className="space-y-3">
-              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge className="bg-primary text-primary-foreground">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">{canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }}><Pencil className="h-4 w-4"/></Button>}<Button variant="ghost" size="icon" onClick={()=>handleOpenPreview(g)}><Printer className="h-4 w-4"/></Button>{canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
+              {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge style={{ backgroundColor: eventColor }} className="text-white">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">{canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }}><Pencil className="h-4 w-4"/></Button>}<Button variant="ghost" size="icon" onClick={()=>handleOpenPreview(g)}><Printer className="h-4 w-4"/></Button>{canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
             </div>
           </TabsContent>
 
           {/* ABA Equipe */}
           <TabsContent value="staff" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card border border-border rounded-xl p-6" style={{ borderBottomWidth: '4px', borderBottomColor: eventColor }}>
+              <div className="bg-card border border-border rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2"><HardHat className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total Equipe</span></div>
                 <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.length}</p>
               </div>
-              <div className="bg-card border border-border rounded-xl p-6" style={{ borderBottomWidth: '4px', borderBottomColor: eventColor }}>
+              <div className="bg-card border border-border rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div>
                 <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.filter(s => s.checked_in).length}</p>
               </div>
@@ -573,7 +573,7 @@ export default function EventManagement() {
                     <div className="flex items-center gap-3">
                       <h3 className="font-semibold text-foreground truncate">{s.name}</h3>
                       <Badge className="bg-orange-500 text-white">Equipe</Badge>
-                      {s.checked_in && <Badge className="bg-primary text-primary-foreground">Presente</Badge>}
+                      {s.checked_in && <Badge style={{ backgroundColor: eventColor }} className="text-white">Presente</Badge>}
                     </div>
                     {s.role && <p className="text-sm text-muted-foreground mt-1 truncate">{s.role}</p>}
                   </div>
