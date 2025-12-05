@@ -26,15 +26,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole>(null);
 
   const fetchUserRole = async (userId: string) => {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .single();
-    
-    if (data?.role) {
-      setRole(data.role as AppRole);
-    } else {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching user role:', error);
+        setRole(null);
+        return;
+      }
+      
+      if (data?.role) {
+        setRole(data.role as AppRole);
+      } else {
+        setRole(null);
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error);
       setRole(null);
     }
   };
@@ -63,6 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fetchUserRole(session.user.id);
       }
       setLoading(false);
+    }).catch((error) => {
+      console.error('Error getting session:', error);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -74,51 +88,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, displayName: string, accessCode: string) => {
-    // First validate the access code
-    const { data: codeData, error: codeError } = await supabase
-      .from('access_codes')
-      .select('role')
-      .eq('code', accessCode)
-      .single();
+    try {
+      // First validate the access code
+      const { data: codeData, error: codeError } = await supabase
+        .from('access_codes')
+        .select('role')
+        .eq('code', accessCode)
+        .maybeSingle();
 
-    if (codeError || !codeData) {
-      return { error: new Error('Código de acesso inválido. Verifique com o administrador.') };
-    }
-
-    const validatedRole = codeData.role as AppRole;
-
-    const redirectUrl = `${window.location.origin}/`;
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: { display_name: displayName }
-      }
-    });
-
-    if (signUpError) {
-      return { error: signUpError as Error };
-    }
-
-    // Assign role to user
-    if (authData.user) {
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: authData.user.id, role: validatedRole });
-
-      if (roleError) {
-        console.error('Error assigning role:', roleError);
+      if (codeError) {
+        console.error('Error validating access code:', codeError);
+        return { error: new Error('Erro ao validar código de acesso. Tente novamente.') };
       }
 
-      // Update profile with display name
-      await supabase
-        .from('profiles')
-        .update({ display_name: displayName })
-        .eq('user_id', authData.user.id);
-    }
+      if (!codeData) {
+        return { error: new Error('Código de acesso inválido. Verifique com o administrador.') };
+      }
 
-    return { error: null };
+      const validatedRole = codeData.role as AppRole;
+
+      const redirectUrl = `${window.location.origin}/`;
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: { display_name: displayName }
+        }
+      });
+
+      if (signUpError) {
+        return { error: signUpError as Error };
+      }
+
+      // Assign role to user
+      if (authData.user) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: authData.user.id, role: validatedRole });
+
+        if (roleError) {
+          console.error('Error assigning role:', roleError);
+        }
+
+        // Update profile with display name
+        await supabase
+          .from('profiles')
+          .update({ display_name: displayName })
+          .eq('user_id', authData.user.id);
+      }
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error during signup:', error);
+      return { error: error as Error };
+    }
   };
 
   const signOut = async () => {
