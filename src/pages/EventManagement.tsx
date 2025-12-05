@@ -10,11 +10,13 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  ArrowLeft, Search, Upload, Plus, Download, Settings, 
+import {
+  ArrowLeft, Search, Upload, Plus, Download, Settings,
   Printer, Users, UserCheck, Loader2, ExternalLink, Trash2, Pencil,
-  Monitor, Wifi, History, Clock, Image as ImageIcon, Smartphone, QrCode
+  Monitor, Wifi, History, Clock, Image as ImageIcon, Smartphone, QrCode,
+  Minus, PlusIcon, Type, RotateCcw
 } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 import * as XLSX from 'xlsx';
 
 // --- INTERFACES ---
@@ -139,6 +141,10 @@ export default function EventManagement() {
   const [adding, setAdding] = useState(false);
   const [printingGuest, setPrintingGuest] = useState<Guest | null>(null);
   const [previewGuest, setPreviewGuest] = useState<Guest | null>(null);
+
+  // Estados para ajuste de fonte da etiqueta (valores em pt)
+  const [nameFontSize, setNameFontSize] = useState(17);
+  const [companyFontSize, setCompanyFontSize] = useState(10);
 
   const [editGuestOpen, setEditGuestOpen] = useState(false);
   const [guestToEdit, setGuestToEdit] = useState<Guest | null>(null);
@@ -290,29 +296,25 @@ export default function EventManagement() {
   return (
     <div className="min-h-screen bg-background">
       
-      {/* CSS IMPRESSÃO BLINDADO: ORIENTAÇÃO TRAVADA EM LANDSCAPE */}
+      {/* CSS IMPRESSÃO DINÂMICO: USA VALORES AJUSTÁVEIS */}
       <style>{`
         @media print {
-          /* FORÇA ORIENTAÇÃO HORIZONTAL (LANDSCAPE) */
           @page {
             size: 90mm 35mm landscape;
             margin: 0;
             orientation: landscape;
           }
 
-          /* Esconde o corpo do site e força fundo branco */
           html, body {
             margin: 0 !important;
             padding: 0 !important;
             width: 90mm !important;
             height: 35mm !important;
             background: white !important;
-            background-color: white !important;
           }
 
           body * { visibility: hidden; }
 
-          /* Container de impressão */
           .print-container {
             visibility: visible !important;
             position: fixed !important;
@@ -322,87 +324,55 @@ export default function EventManagement() {
             height: 35mm !important;
             margin: 0 !important;
             padding: 0 !important;
-            transform: none !important;
             background: white !important;
-            background-color: white !important;
           }
 
-          /* Força visibilidade e cores corretas */
-          .print-container,
           .print-container *,
-          .print-label,
           .print-label *,
           .guest-name,
           .guest-company {
             visibility: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-            color-adjust: exact !important;
           }
 
           .print-label {
-            position: relative !important;
             width: 90mm !important;
             height: 35mm !important;
-            min-width: 90mm !important;
-            min-height: 35mm !important;
-            max-width: 90mm !important;
-            max-height: 35mm !important;
-
             display: flex !important;
             flex-direction: column !important;
             justify-content: center !important;
             align-items: center !important;
             text-align: center !important;
-
             background: white !important;
-            color: black !important;
-
             padding: 0 3mm !important;
-            margin: 0 !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
           }
 
-          /* NOME: 14pt e NUNCA QUEBRA LINHA */
           .guest-name {
-            display: block !important;
-            opacity: 1 !important;
-            position: relative !important;
             font-family: 'Inter', Arial, sans-serif !important;
             font-weight: 800 !important;
-            font-size: 17pt !important;
+            font-size: ${nameFontSize}pt !important;
             line-height: 1.1 !important;
             width: 100% !important;
-
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
-
             margin: 0 0 1.5mm 0 !important;
-            padding: 0 !important;
             color: black !important;
           }
 
-          /* EMPRESA: 14pt e NUNCA QUEBRA LINHA */
           .guest-company {
-            display: block !important;
-            opacity: 1 !important;
-            position: relative !important;
             font-family: 'Inter', Arial, sans-serif !important;
             font-weight: 500 !important;
-            font-size: 10pt !important;
+            font-size: ${companyFontSize}pt !important;
             line-height: 1.2 !important;
             width: 100% !important;
-
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
-
             margin: 0 !important;
-            padding: 0 !important;
             color: black !important;
           }
         }
@@ -489,108 +459,180 @@ export default function EventManagement() {
           </DialogContent>
         </Dialog>
 
-        {/* MODAL PREVIEW DA ETIQUETA - ESTILO BARTENDER */}
+        {/* MODAL PREVIEW DA ETIQUETA - ESTILO BARTENDER COM AJUSTES */}
         <Dialog open={!!previewGuest} onOpenChange={(open) => !open && setPreviewGuest(null)}>
-          <DialogContent className="bg-[#2a2a2a] border-[#444] max-w-lg">
+          <DialogContent className="bg-[#1e1e1e] border-[#333] max-w-xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-white">
                 <Printer className="h-5 w-5 text-yellow-500" />
                 Preview da Etiqueta
               </DialogTitle>
             </DialogHeader>
-            <div className="mt-2 space-y-4">
-              {/* Área de preview com fundo escuro estilo editor */}
-              <div className="bg-[#1a1a1a] rounded-lg p-6 relative">
+            <div className="space-y-4">
+              {/* PREVIEW DA ETIQUETA - Escala: 1mm = 3.78px (96dpi) */}
+              <div className="bg-[#0d0d0d] rounded-lg p-4">
                 {/* Régua superior */}
-                <div className="flex justify-between text-[10px] text-gray-500 mb-2 px-1">
-                  <span>0mm</span>
-                  <span>45mm</span>
-                  <span>90mm</span>
+                <div className="flex justify-between text-[9px] text-gray-600 mb-1 font-mono" style={{ width: '340px', margin: '0 auto' }}>
+                  <span>|0</span>
+                  <span>45|</span>
+                  <span>90mm|</span>
                 </div>
 
-                {/* Container da etiqueta com sombra e proporção exata */}
-                <div className="relative mx-auto" style={{ width: '340px', height: '132px' }}>
-                  {/* Sombra da etiqueta */}
-                  <div
-                    className="absolute inset-0 bg-black/30 rounded-sm"
-                    style={{ transform: 'translate(4px, 4px)' }}
-                  />
+                {/* Container da etiqueta */}
+                <div className="flex justify-center">
+                  <div className="relative" style={{ width: '340px', height: '132px' }}>
+                    {/* Sombra */}
+                    <div className="absolute inset-0 bg-black/40 rounded" style={{ transform: 'translate(3px, 3px)' }} />
 
-                  {/* ETIQUETA - Réplica exata da impressão */}
-                  <div
-                    className="relative bg-white rounded-sm overflow-hidden"
-                    style={{
-                      width: '340px',  /* 90mm em escala */
-                      height: '132px', /* 35mm em escala */
-                      boxShadow: '0 0 0 1px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    {/* Conteúdo centralizado - IDÊNTICO ao print-label */}
+                    {/* ETIQUETA - 90mm x 35mm em escala */}
                     <div
-                      className="w-full h-full flex flex-col justify-center items-center text-center"
-                      style={{ padding: '0 11px' }} /* 3mm em escala */
+                      className="relative bg-white rounded overflow-hidden border border-gray-300"
+                      style={{ width: '340px', height: '132px' }}
                     >
-                      {/* Nome - 17pt convertido para escala */}
+                      {/* Conteúdo centralizado */}
                       <div
-                        className="w-full truncate text-black"
-                        style={{
-                          fontFamily: "'Inter', Arial, sans-serif",
-                          fontWeight: 800,
-                          fontSize: '21px', /* 17pt em escala proporcional */
-                          lineHeight: 1.1,
-                          marginBottom: '6px' /* 1.5mm em escala */
-                        }}
+                        className="w-full h-full flex flex-col justify-center items-center text-center"
+                        style={{ padding: '0 11px' }}
                       >
-                        {previewGuest && formatNameForBadge(previewGuest.name)}
-                      </div>
-
-                      {/* Empresa - 10pt convertido para escala */}
-                      {previewGuest?.company && (
+                        {/* NOME - Usa o valor ajustável */}
                         <div
                           className="w-full truncate text-black"
                           style={{
                             fontFamily: "'Inter', Arial, sans-serif",
-                            fontWeight: 500,
-                            fontSize: '12px', /* 10pt em escala proporcional */
-                            lineHeight: 1.2
+                            fontWeight: 800,
+                            fontSize: `${nameFontSize * 1.24}px`, /* pt para px em escala */
+                            lineHeight: 1.1,
+                            marginBottom: '6px'
                           }}
                         >
-                          {previewGuest.company}
+                          {previewGuest && formatNameForBadge(previewGuest.name)}
                         </div>
-                      )}
+
+                        {/* EMPRESA - Usa o valor ajustável */}
+                        {previewGuest?.company && (
+                          <div
+                            className="w-full truncate text-black"
+                            style={{
+                              fontFamily: "'Inter', Arial, sans-serif",
+                              fontWeight: 500,
+                              fontSize: `${companyFontSize * 1.2}px`,
+                              lineHeight: 1.2
+                            }}
+                          >
+                            {previewGuest.company}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Régua lateral */}
-                <div className="absolute right-2 top-10 bottom-10 flex flex-col justify-between text-[10px] text-gray-500">
-                  <span>0</span>
-                  <span>17</span>
-                  <span>35mm</span>
+                {/* Info */}
+                <div className="flex justify-center gap-3 mt-2 text-[10px] text-gray-500">
+                  <span>90mm × 35mm</span>
+                  <span>•</span>
+                  <span>Landscape</span>
                 </div>
               </div>
 
-              {/* Info da etiqueta */}
-              <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
-                <span className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  90mm × 35mm
-                </span>
-                <span>Bematech LB-1000</span>
-                <span>Landscape</span>
+              {/* CONTROLES DE AJUSTE DE FONTE */}
+              <div className="bg-[#252525] rounded-lg p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-300 flex items-center gap-2">
+                    <Type className="h-4 w-4" />
+                    Ajustar Fontes
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-white h-7 px-2"
+                    onClick={() => { setNameFontSize(17); setCompanyFontSize(10); }}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Reset
+                  </Button>
+                </div>
+
+                {/* Controle do Nome */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">Nome</span>
+                    <span className="text-xs text-yellow-500 font-mono">{nameFontSize}pt</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]"
+                      onClick={() => setNameFontSize(Math.max(10, nameFontSize - 1))}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <Slider
+                      value={[nameFontSize]}
+                      onValueChange={(v) => setNameFontSize(v[0])}
+                      min={10}
+                      max={28}
+                      step={1}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]"
+                      onClick={() => setNameFontSize(Math.min(28, nameFontSize + 1))}
+                    >
+                      <PlusIcon className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Controle da Empresa */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">Empresa</span>
+                    <span className="text-xs text-yellow-500 font-mono">{companyFontSize}pt</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]"
+                      onClick={() => setCompanyFontSize(Math.max(6, companyFontSize - 1))}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <Slider
+                      value={[companyFontSize]}
+                      onValueChange={(v) => setCompanyFontSize(v[0])}
+                      min={6}
+                      max={18}
+                      step={1}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]"
+                      onClick={() => setCompanyFontSize(Math.min(18, companyFontSize + 1))}
+                    >
+                      <PlusIcon className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               {/* Botões */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  className="flex-1 border-[#555] text-gray-300 hover:bg-[#333] hover:text-white"
+                  className="flex-1 border-[#444] text-gray-300 hover:bg-[#333] hover:text-white"
                   onClick={() => setPreviewGuest(null)}
                 >
                   Cancelar
                 </Button>
                 <Button
-                  className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-semibold"
+                  className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-black font-semibold"
                   onClick={handleConfirmPrint}
                 >
                   <Printer className="h-4 w-4 mr-2" />
