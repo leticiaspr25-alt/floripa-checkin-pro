@@ -499,13 +499,13 @@ export default function EventManagement() {
       </header>
 
       <main className="container mx-auto px-4 py-6 print:hidden">
-        {/* CSS dinâmico para cor do evento */}
+        {/* CSS dinâmico para cor do evento - APENAS nas tabs */}
         <style>{`
-          .event-tabs [data-state="active"] {
+          .event-tabs [role="tablist"] button[data-state="active"] {
             background-color: ${eventColor} !important;
             color: white !important;
           }
-          .event-tabs [data-state="active"]:hover {
+          .event-tabs [role="tablist"] button[data-state="active"]:hover {
             background-color: ${eventColor} !important;
           }
         `}</style>
