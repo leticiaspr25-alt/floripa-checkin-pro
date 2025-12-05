@@ -512,6 +512,10 @@ export default function EventManagement() {
           .event-tabs button[role="switch"][data-state="checked"] {
             background-color: ${secondaryColor} !important;
           }
+          .event-tabs button.inline-flex:hover:not([role="switch"]):not([data-state]) {
+            background-color: ${eventColor}20 !important;
+            color: ${eventColor} !important;
+          }
         `}</style>
 
         <Tabs defaultValue="guests" className="space-y-6 event-tabs" onValueChange={(v) => { if(v === 'history') fetchActivityLogs(); }}>
