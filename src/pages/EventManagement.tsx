@@ -158,7 +158,7 @@ export default function EventManagement() {
   const [guestToEdit, setGuestToEdit] = useState<Guest | null>(null);
   const [editFormData, setEditFormData] = useState({ name: '', company: '', role: '' });
 
-  // Estados para EQUIPE
+  // Estados para Equipe
   const [staff, setStaff] = useState<Staff[]>([]);
   const [staffSearchTerm, setStaffSearchTerm] = useState('');
   const [addStaffOpen, setAddStaffOpen] = useState(false);
@@ -462,12 +462,12 @@ export default function EventManagement() {
         </div>
       )}
 
-      {/* CONTAINER DE IMPRESSÃO - EQUIPE */}
+      {/* CONTAINER DE IMPRESSÃO - Equipe */}
       {printingStaff && (
         <div className="print-container">
           <div className="print-label">
             <div className="guest-name">{formatNameForBadge(printingStaff.name)}</div>
-            <div className="guest-company">{printingStaff.role || 'EQUIPE'}</div>
+            <div className="guest-company">{printingStaff.role || 'Equipe'}</div>
           </div>
         </div>
       )}
@@ -507,7 +507,7 @@ export default function EventManagement() {
             </div>
           </TabsContent>
 
-          {/* ABA EQUIPE */}
+          {/* ABA Equipe */}
           <TabsContent value="staff" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-card border border-border rounded-xl p-6">
@@ -546,7 +546,7 @@ export default function EventManagement() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
                       <h3 className="font-semibold text-foreground truncate">{s.name}</h3>
-                      <Badge className="bg-orange-500 text-white">EQUIPE</Badge>
+                      <Badge className="bg-orange-500 text-white">Equipe</Badge>
                       {s.checked_in && <Badge className="bg-primary text-primary-foreground">Presente</Badge>}
                     </div>
                     {s.role && <p className="text-sm text-muted-foreground mt-1 truncate">{s.role}</p>}
@@ -830,14 +830,14 @@ export default function EventManagement() {
                           {previewStaff && formatNameForBadge(previewStaff.name)}
                         </div>
                         <div className="w-full truncate text-black" style={{ fontFamily: "'Inter', Arial, sans-serif", fontWeight: 500, fontSize: `${companyFontSize * 1.2}px`, lineHeight: 1.2 }}>
-                          {previewStaff?.role || 'EQUIPE'}
+                          {previewStaff?.role || 'Equipe'}
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="flex justify-center gap-3 mt-2 text-[10px] text-gray-500">
-                  <span className="text-orange-500">EQUIPE</span>
+                  <span className="text-orange-500">Equipe</span>
                   <span>•</span>
                   <span>90mm × 35mm</span>
                 </div>
