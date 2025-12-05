@@ -33,6 +33,7 @@ interface Event {
   primary_color: string | null;
   secondary_color: string | null;
   tertiary_color: string | null;
+  event_logo_size: number | null;
 }
 
 interface Guest {
@@ -175,7 +176,7 @@ export default function EventManagement() {
 
   const [eventSettings, setEventSettings] = useState({
     name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: '',
-    event_logo_url: '', primary_color: '#f37021', secondary_color: '', tertiary_color: ''
+    event_logo_url: '', primary_color: '#f37021', secondary_color: '', tertiary_color: '', event_logo_size: 150
   });
 
   const canImportExport = isAdmin || isEquipe;
@@ -207,7 +208,8 @@ export default function EventManagement() {
         wifi_ssid: data.wifi_ssid || '', wifi_pass: data.wifi_pass || '',
         photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', photo_img_url: data.photo_img_url || '',
         event_logo_url: data.event_logo_url || '', primary_color: data.primary_color || '#f37021',
-        secondary_color: data.secondary_color || '', tertiary_color: data.tertiary_color || ''
+        secondary_color: data.secondary_color || '', tertiary_color: data.tertiary_color || '',
+        event_logo_size: data.event_logo_size || 150
       });
     }
     setLoading(false);
@@ -358,7 +360,8 @@ export default function EventManagement() {
       wifi_ssid: eventSettings.wifi_ssid || null, wifi_pass: eventSettings.wifi_pass || null,
       photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null, photo_img_url: eventSettings.photo_img_url || null,
       event_logo_url: eventSettings.event_logo_url || null, primary_color: eventSettings.primary_color || '#f37021',
-      secondary_color: eventSettings.secondary_color || null, tertiary_color: eventSettings.tertiary_color || null
+      secondary_color: eventSettings.secondary_color || null, tertiary_color: eventSettings.tertiary_color || null,
+      event_logo_size: eventSettings.event_logo_size || 150
     }).eq('id', id);
     if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Salvo!' }); await logActivity('Atualizou configurações', 'Alterações salvas'); fetchEvent(); }
     setSaving(false);
@@ -517,8 +520,8 @@ export default function EventManagement() {
 
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.length}</p></div>
-              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.filter(g=>g.checked_in).length}</p></div>
+              <div className="bg-card border border-border rounded-xl p-6" style={{ borderBottomWidth: '4px', borderBottomColor: eventColor }}><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.length}</p></div>
+              <div className="bg-card border border-border rounded-xl p-6" style={{ borderBottomWidth: '4px', borderBottomColor: eventColor }}><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.filter(g=>g.checked_in).length}</p></div>
             </div>
             <div className="flex flex-wrap gap-3 items-center">
               <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar convidado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-card border-border" /></div>
@@ -533,11 +536,11 @@ export default function EventManagement() {
           {/* ABA Equipe */}
           <TabsContent value="staff" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card border border-border rounded-xl p-6">
+              <div className="bg-card border border-border rounded-xl p-6" style={{ borderBottomWidth: '4px', borderBottomColor: eventColor }}>
                 <div className="flex items-center gap-3 mb-2"><HardHat className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total Equipe</span></div>
                 <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.length}</p>
               </div>
-              <div className="bg-card border border-border rounded-xl p-6">
+              <div className="bg-card border border-border rounded-xl p-6" style={{ borderBottomWidth: '4px', borderBottomColor: eventColor }}>
                 <div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div>
                 <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.filter(s => s.checked_in).length}</p>
               </div>
@@ -614,13 +617,64 @@ export default function EventManagement() {
                   {/* Logo do Evento */}
                   <div className="space-y-3 mb-6">
                     <Label>Logo do Evento</Label>
-                    <div className="max-w-xs">
-                      <UploadBox
-                        label="Logo do Evento"
-                        icon="image"
-                        previewUrl={eventSettings.event_logo_url}
-                        onUpload={(url) => setEventSettings({...eventSettings, event_logo_url: url})}
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <UploadBox
+                          label="Logo do Evento"
+                          icon="image"
+                          previewUrl={eventSettings.event_logo_url}
+                          onUpload={(url) => setEventSettings({...eventSettings, event_logo_url: url})}
+                        />
+                      </div>
+                      {eventSettings.event_logo_url && (
+                        <div className="space-y-4">
+                          <div className="bg-secondary/30 rounded-lg p-4">
+                            <p className="text-sm text-muted-foreground mb-3">Preview do tamanho:</p>
+                            <div className="flex items-center justify-center bg-black/50 rounded-lg p-4 min-h-[120px]">
+                              <img
+                                src={eventSettings.event_logo_url}
+                                alt="Logo Preview"
+                                style={{ width: `${eventSettings.event_logo_size}px`, height: 'auto', maxHeight: '100px', objectFit: 'contain' }}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label>Tamanho da Logo</Label>
+                              <span className="text-sm text-muted-foreground">{eventSettings.event_logo_size}px</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setEventSettings({...eventSettings, event_logo_size: Math.max(50, eventSettings.event_logo_size - 10)})}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <Slider
+                                value={[eventSettings.event_logo_size]}
+                                onValueChange={(v) => setEventSettings({...eventSettings, event_logo_size: v[0]})}
+                                min={50}
+                                max={300}
+                                step={10}
+                                className="flex-1"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setEventSettings({...eventSettings, event_logo_size: Math.min(300, eventSettings.event_logo_size + 10)})}
+                              >
+                                <PlusIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Ajuste o tamanho da logo no Totem e TV (50px a 300px)</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">Aparecerá no Totem e na TV</p>
                   </div>
