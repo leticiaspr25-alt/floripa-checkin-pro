@@ -315,11 +315,10 @@ export default function EventManagement() {
     // Aguarda o modal fechar antes de setar o staff para impressão
     setTimeout(() => {
       setPrintingStaff(staffToPrint);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.print();
-        });
-      });
+      // Aguarda o React renderizar o container
+      setTimeout(() => {
+        window.print();
+      }, 150);
     }, 100);
   };
 
@@ -334,11 +333,10 @@ export default function EventManagement() {
     // Aguarda o modal fechar antes de setar o guest para impressão
     setTimeout(() => {
       setPrintingGuest(guestToPrint);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.print();
-        });
-      });
+      // Aguarda o React renderizar o container
+      setTimeout(() => {
+        window.print();
+      }, 150);
     }, 100);
   };
 
@@ -482,20 +480,20 @@ export default function EventManagement() {
 
       {/* CONTAINER DE IMPRESSÃO - CONVIDADO */}
       {printingGuest && (
-        <div className="print-container">
-          <div className="print-label">
-            <div className="guest-name">{formatNameForBadge(printingGuest.name)}</div>
-            {printingGuest.company && <div className="guest-company">{printingGuest.company}</div>}
+        <div className="print-container" style={{ position: 'fixed', top: 0, left: 0, zIndex: 99999, background: 'white' }}>
+          <div className="print-label" style={{ width: '90mm', height: '35mm', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'white', padding: '0 3mm', boxSizing: 'border-box' }}>
+            <div className="guest-name" style={{ fontFamily: 'Inter, Arial, sans-serif', fontWeight: 800, fontSize: `${nameFontSize}pt`, lineHeight: 1.1, color: 'black', margin: '0 0 1.5mm 0' }}>{formatNameForBadge(printingGuest.name)}</div>
+            {printingGuest.company && <div className="guest-company" style={{ fontFamily: 'Inter, Arial, sans-serif', fontWeight: 500, fontSize: `${companyFontSize}pt`, lineHeight: 1.2, color: 'black' }}>{printingGuest.company}</div>}
           </div>
         </div>
       )}
 
       {/* CONTAINER DE IMPRESSÃO - Equipe */}
       {printingStaff && (
-        <div className="print-container">
-          <div className="print-label">
-            <div className="guest-name">{formatNameForBadge(printingStaff.name)}</div>
-            <div className="guest-company">{printingStaff.role || 'Equipe'}</div>
+        <div className="print-container" style={{ position: 'fixed', top: 0, left: 0, zIndex: 99999, background: 'white' }}>
+          <div className="print-label" style={{ width: '90mm', height: '35mm', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'white', padding: '0 3mm', boxSizing: 'border-box' }}>
+            <div className="guest-name" style={{ fontFamily: 'Inter, Arial, sans-serif', fontWeight: 800, fontSize: `${nameFontSize}pt`, lineHeight: 1.1, color: 'black', margin: '0 0 1.5mm 0' }}>{formatNameForBadge(printingStaff.name)}</div>
+            <div className="guest-company" style={{ fontFamily: 'Inter, Arial, sans-serif', fontWeight: 500, fontSize: `${companyFontSize}pt`, lineHeight: 1.2, color: 'black' }}>{printingStaff.role || 'Equipe'}</div>
           </div>
         </div>
       )}
