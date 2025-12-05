@@ -370,6 +370,9 @@ export default function EventManagement() {
 
   const formatLogTime = (ts: string) => new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
+  // Cor do evento (usa laranja padrão se não tiver)
+  const eventColor = eventSettings.primary_color || '#f37021';
+
   if (authLoading || loading) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
@@ -489,18 +492,29 @@ export default function EventManagement() {
       </header>
 
       <main className="container mx-auto px-4 py-6 print:hidden">
-        <Tabs defaultValue="guests" className="space-y-6" onValueChange={(v) => { if(v === 'history') fetchActivityLogs(); }}>
+        {/* CSS dinâmico para cor do evento */}
+        <style>{`
+          .event-tabs [data-state="active"] {
+            background-color: ${eventColor} !important;
+            color: white !important;
+          }
+          .event-tabs [data-state="active"]:hover {
+            background-color: ${eventColor} !important;
+          }
+        `}</style>
+
+        <Tabs defaultValue="guests" className="space-y-6 event-tabs" onValueChange={(v) => { if(v === 'history') fetchActivityLogs(); }}>
           <TabsList className="bg-card border border-border">
-            <TabsTrigger value="guests" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Convidados</TabsTrigger>
-            <TabsTrigger value="staff" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Equipe</TabsTrigger>
-            {canAccessHistory && <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Histórico</TabsTrigger>}
-            {canAccessSettings && <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Configurações</TabsTrigger>}
+            <TabsTrigger value="guests">Convidados</TabsTrigger>
+            <TabsTrigger value="staff">Equipe</TabsTrigger>
+            {canAccessHistory && <TabsTrigger value="history">Histórico</TabsTrigger>}
+            {canAccessSettings && <TabsTrigger value="settings">Configurações</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="guests" className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold text-primary">{guests.length}</p></div>
-              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold text-primary">{guests.filter(g=>g.checked_in).length}</p></div>
+              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><Users className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.length}</p></div>
+              <div className="bg-card border border-border rounded-xl p-6"><div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div><p className="text-5xl font-bold" style={{ color: eventColor }}>{guests.filter(g=>g.checked_in).length}</p></div>
             </div>
             <div className="flex flex-wrap gap-3 items-center">
               <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Buscar convidado..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 bg-card border-border" /></div>
@@ -517,11 +531,11 @@ export default function EventManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-card border border-border rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2"><HardHat className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total Equipe</span></div>
-                <p className="text-5xl font-bold text-primary">{staff.length}</p>
+                <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.length}</p>
               </div>
               <div className="bg-card border border-border rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div>
-                <p className="text-5xl font-bold text-primary">{staff.filter(s => s.checked_in).length}</p>
+                <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.filter(s => s.checked_in).length}</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-3 items-center">
