@@ -622,23 +622,54 @@ export default function EventManagement() {
                     {/* Cor Principal */}
                     <div className="space-y-3">
                       <Label>Cor Principal do Evento</Label>
-                      <div className="flex items-center gap-4">
+
+                      {/* Paleta de cores pré-definidas */}
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">Selecione uma cor:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { color: '#f37021', name: 'Laranja' },
+                            { color: '#3b82f6', name: 'Azul' },
+                            { color: '#10b981', name: 'Verde' },
+                            { color: '#8b5cf6', name: 'Roxo' },
+                            { color: '#ef4444', name: 'Vermelho' },
+                            { color: '#ec4899', name: 'Rosa' },
+                            { color: '#f59e0b', name: 'Amarelo' },
+                            { color: '#06b6d4', name: 'Ciano' },
+                          ].map(({ color, name }) => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => setEventSettings({...eventSettings, primary_color: color})}
+                              className={`w-10 h-10 rounded-lg transition-all hover:scale-110 ${
+                                eventSettings.primary_color === color
+                                  ? 'ring-2 ring-white ring-offset-2 ring-offset-background'
+                                  : 'hover:ring-1 hover:ring-border'
+                              }`}
+                              style={{ backgroundColor: color }}
+                              title={name}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Cor personalizada */}
+                      <div className="flex items-center gap-3 pt-2">
                         <input
                           type="color"
                           value={eventSettings.primary_color}
                           onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
-                          className="w-16 h-16 rounded-lg cursor-pointer border-2 border-border"
+                          className="w-10 h-10 rounded-lg cursor-pointer border-2 border-border"
                         />
-                        <div className="flex-1">
-                          <Input
-                            value={eventSettings.primary_color}
-                            onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
-                            className="bg-card border-border font-mono"
-                            placeholder="#f37021"
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">Código hexadecimal da cor</p>
-                        </div>
+                        <Input
+                          value={eventSettings.primary_color}
+                          onChange={e => setEventSettings({...eventSettings, primary_color: e.target.value})}
+                          className="bg-card border-border font-mono flex-1"
+                          placeholder="#f37021"
+                        />
                       </div>
+                      <p className="text-xs text-muted-foreground">Ou escolha uma cor personalizada</p>
+
                       {/* Preview da cor */}
                       <div className="flex gap-2 mt-2">
                         <div className="flex-1 h-8 rounded" style={{ backgroundColor: eventSettings.primary_color }} />
