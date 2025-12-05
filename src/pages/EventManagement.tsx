@@ -883,27 +883,35 @@ export default function EventManagement() {
                       >
                         {/* NOME - Usa o valor ajustável */}
                         <div
-                          className="w-full truncate text-black"
                           style={{
+                            width: '100%',
                             fontFamily: "'Inter', Arial, sans-serif",
                             fontWeight: 800,
-                            fontSize: `${nameFontSize * 1.24}px`, /* pt para px em escala */
+                            fontSize: `${nameFontSize * 1.24}px`,
                             lineHeight: 1.1,
-                            marginBottom: '6px'
+                            marginBottom: '6px',
+                            color: '#000000',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
                           }}
                         >
-                          {previewGuest && formatNameForBadge(previewGuest.name)}
+                          {previewGuest ? formatNameForBadge(previewGuest.name) : ''}
                         </div>
 
                         {/* EMPRESA - Usa o valor ajustável */}
                         {previewGuest?.company && (
                           <div
-                            className="w-full truncate text-black"
                             style={{
+                              width: '100%',
                               fontFamily: "'Inter', Arial, sans-serif",
                               fontWeight: 500,
                               fontSize: `${companyFontSize * 1.2}px`,
-                              lineHeight: 1.2
+                              lineHeight: 1.2,
+                              color: '#000000',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
                             }}
                           >
                             {previewGuest.company}
@@ -1052,10 +1060,35 @@ export default function EventManagement() {
                     <div className="absolute inset-0 bg-black/40 rounded" style={{ transform: 'translate(3px, 3px)' }} />
                     <div className="relative bg-white rounded overflow-hidden border border-gray-300" style={{ width: '340px', height: '132px' }}>
                       <div className="w-full h-full flex flex-col justify-center items-center text-center" style={{ padding: '0 11px' }}>
-                        <div className="w-full truncate text-black" style={{ fontFamily: "'Inter', Arial, sans-serif", fontWeight: 800, fontSize: `${nameFontSize * 1.24}px`, lineHeight: 1.1, marginBottom: '6px' }}>
-                          {previewStaff && formatNameForBadge(previewStaff.name)}
+                        <div
+                          style={{
+                            width: '100%',
+                            fontFamily: "'Inter', Arial, sans-serif",
+                            fontWeight: 800,
+                            fontSize: `${nameFontSize * 1.24}px`,
+                            lineHeight: 1.1,
+                            marginBottom: '6px',
+                            color: '#000000',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {previewStaff ? formatNameForBadge(previewStaff.name) : ''}
                         </div>
-                        <div className="w-full truncate text-black" style={{ fontFamily: "'Inter', Arial, sans-serif", fontWeight: 500, fontSize: `${companyFontSize * 1.2}px`, lineHeight: 1.2 }}>
+                        <div
+                          style={{
+                            width: '100%',
+                            fontFamily: "'Inter', Arial, sans-serif",
+                            fontWeight: 500,
+                            fontSize: `${companyFontSize * 1.2}px`,
+                            lineHeight: 1.2,
+                            color: '#000000',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
                           {previewStaff?.role || 'Equipe'}
                         </div>
                       </div>
