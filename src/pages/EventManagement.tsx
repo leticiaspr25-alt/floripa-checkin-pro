@@ -14,7 +14,7 @@ import {
   ArrowLeft, Search, Upload, Plus, Download, Settings,
   Printer, Users, UserCheck, Loader2, ExternalLink, Trash2, Pencil,
   Monitor, Wifi, History, Clock, Image as ImageIcon, Smartphone, QrCode,
-  Minus, PlusIcon, Type, RotateCcw, HardHat
+  Minus, PlusIcon, Type, RotateCcw, HardHat, Bell, BellRing, Volume2
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import * as XLSX from 'xlsx';
@@ -180,6 +180,11 @@ export default function EventManagement() {
   const [editStaffFormData, setEditStaffFormData] = useState({ name: '', role: '' });
   const [previewStaff, setPreviewStaff] = useState<Staff | null>(null);
 
+  // Sistema de notificação de check-in em tempo real
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const previousGuestsRef = useRef<Guest[]>([]);
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
+
   const [eventSettings, setEventSettings] = useState({
     name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: '',
     event_logo_url: '', primary_color: '#f37021', secondary_color: '', tertiary_color: '', event_logo_size: 150
@@ -198,6 +203,12 @@ export default function EventManagement() {
 
   useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
   useEffect(() => { if (id && user) { fetchEvent(); fetchGuests(); fetchStaff(); subscribeToGuests(); subscribeToStaff(); } }, [id, user]);
+
+  // Inicializa o som de notificação
+  useEffect(() => {
+    notificationSoundRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleiorZKTQ3bhxHQI1l+XqqnojETaU6PiufRsMO5jl+66FGAU3mOz9s4oeAzWY8P+2jRkBO5z1/7mOFwA+oP3/u44TAEOl//+7jQ8ASKz/+rqNCgBRtP/2uYsGAFu+//K3iAIAZcn/7bODAG/V/ue0ggBz3f/ivH4Aet7/37d5AH7f/924dgCB4P/buHMAguH/2blyAIPi/9e6cACD4//Wu3AAg+T/1bxwAIPl/9S9bwCD5v/TvW8Ag+f/0r5vAIPo/9G/bwCD6f/QwG8Ag+r/z8FwAIPr/87CcACC7P/NxHAAger/zMVwAH/q/8zHcQB96v/My3EAeur/zM9yAHfp/8zTdAB06P/N2HYAcej/zd55AG7n/87lggBr5f/P7I0AaOP/0fKYAGbh/9P4owBk4P/V/q0AY97/2AOzAGLd/9oGtgBi3P/bCLgAY9z/3Ai4AGTc/90ItwBl3P/dB7UAZt3/3gSyAGje/98BrwBq3//g/qsAbeD/4vulAHDh/+L4oABz4v/j9ZoAd+P/5fGVAHvk/+ftjwB/5f/q6YoAg+b/7OOGAIDY/+/egACS1v/y2HsAptP/9dJ3ALvQ//nNdADP0P/8yHIA4tL//MRxAPTV//7BcQD21//+wHAA');
+    notificationSoundRef.current.volume = 0.5;
+  }, []);
 
   const fetchEvent = async () => {
     const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
