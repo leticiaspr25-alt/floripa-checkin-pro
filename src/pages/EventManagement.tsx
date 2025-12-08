@@ -265,6 +265,18 @@ export default function EventManagement() {
         : g
     ));
 
+    // Se está marcando check-in, adiciona ao feed ao vivo IMEDIATAMENTE
+    if (newCheckedIn) {
+      setLiveCheckins(prev => [{
+        id: guest.id + '-' + Date.now(),
+        name: guest.name,
+        company: guest.company || '',
+        time: new Date()
+      }, ...prev].slice(0, 50));
+      // Atualiza referência para não duplicar quando vier do subscription
+      previousGuestsRef.current.set(guest.id, true);
+    }
+
     // Requisição ao banco em background
     const { error } = await supabase
       .from('guests')
@@ -278,6 +290,11 @@ export default function EventManagement() {
           ? { ...g, checked_in: guest.checked_in, checkin_time: guest.checkin_time }
           : g
       ));
+      // Remove do feed se deu erro
+      if (newCheckedIn) {
+        setLiveCheckins(prev => prev.filter(c => !c.id.startsWith(guest.id)));
+        previousGuestsRef.current.set(guest.id, false);
+      }
       toast({ title: 'Erro', description: 'Falha ao atualizar.', variant: 'destructive' });
     } else {
       // Log em background (sem await - não bloqueia)
