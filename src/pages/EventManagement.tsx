@@ -61,6 +61,14 @@ interface Staff {
   checkin_time: string | null;
 }
 
+// --- FUNÇÃO PARA NORMALIZAR TEXTO (remover acentos para busca) ---
+const normalizeText = (text: string): string => {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+};
+
 // --- FUNÇÃO DE NOME INTELIGENTE (1º Nome + 2 Sobrenomes) ---
 const formatNameForBadge = (fullName: string) => {
   if (!fullName) return "";
@@ -460,11 +468,11 @@ export default function EventManagement() {
   };
 
   const filteredGuests = guests
-    .filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.company?.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(g => normalizeText(g.name).includes(normalizeText(searchTerm)) || normalizeText(g.company || '').includes(normalizeText(searchTerm)))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const filteredStaff = staff
-    .filter(s => s.name.toLowerCase().includes(staffSearchTerm.toLowerCase()) || s.role?.toLowerCase().includes(staffSearchTerm.toLowerCase()))
+    .filter(s => normalizeText(s.name).includes(normalizeText(staffSearchTerm)) || normalizeText(s.role || '').includes(normalizeText(staffSearchTerm)))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const formatLogTime = (ts: string) => new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
