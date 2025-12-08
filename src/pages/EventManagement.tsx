@@ -172,10 +172,15 @@ export default function EventManagement() {
   const [editStaffFormData, setEditStaffFormData] = useState({ name: '', role: '' });
   const [previewStaff, setPreviewStaff] = useState<Staff | null>(null);
 
-  // Sistema de notificação de check-in em tempo real
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const previousGuestsRef = useRef<Guest[]>([]);
-  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
+  // Feed ao vivo de check-ins
+  interface LiveCheckIn {
+    id: string;
+    name: string;
+    company: string;
+    time: Date;
+  }
+  const [liveCheckins, setLiveCheckins] = useState<LiveCheckIn[]>([]);
+  const previousGuestsRef = useRef<Map<string, boolean>>(new Map());
 
   const [eventSettings, setEventSettings] = useState({
     name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: '',
@@ -194,13 +199,7 @@ export default function EventManagement() {
   };
 
   useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
-  useEffect(() => { if (id && user) { fetchEvent(); fetchGuests(); fetchStaff(); subscribeToGuests(); subscribeToStaff(); } }, [id, user]);
-
-  // Inicializa o som de notificação
-  useEffect(() => {
-    notificationSoundRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleiorZKTQ3bhxHQI1l+XqqnojETaU6PiufRsMO5jl+66FGAU3mOz9s4oeAzWY8P+2jRkBO5z1/7mOFwA+oP3/u44TAEOl//+7jQ8ASKz/+rqNCgBRtP/2uYsGAFu+//K3iAIAZcn/7bODAG/V/ue0ggBz3f/ivH4Aet7/37d5AH7f/924dgCB4P/buHMAguH/2blyAIPi/9e6cACD4//Wu3AAg+T/1bxwAIPl/9S9bwCD5v/TvW8Ag+f/0r5vAIPo/9G/bwCD6f/QwG8Ag+r/z8FwAIPr/87CcACC7P/NxHAAger/zMVwAH/q/8zHcQB96v/My3EAeur/zM9yAHfp/8zTdAB06P/N2HYAcej/zd55AG7n/87lggBr5f/P7I0AaOP/0fKYAGbh/9P4owBk4P/V/q0AY97/2AOzAGLd/9oGtgBi3P/bCLgAY9z/3Ai4AGTc/90ItwBl3P/dB7UAZt3/3gSyAGje/98BrwBq3//g/qsAbeD/4vulAHDh/+L4oABz4v/j9ZoAd+P/5fGVAHvk/+ftjwB/5f/q6YoAg+b/7OOGAIDY/+/egACS1v/y2HsAptP/9dJ3ALvQ//nNdADP0P/8yHIA4tL//MRxAPTV//7BcQD21//+wHAA');
-    notificationSoundRef.current.volume = 0.5;
-  }, []);
+  useEffect(() => { if (id && user) { fetchEvent(); fetchGuests(true); fetchStaff(); subscribeToGuests(); subscribeToStaff(); } }, [id, user]);
 
   const fetchEvent = async () => {
     const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
@@ -219,10 +218,40 @@ export default function EventManagement() {
     setLoading(false);
   };
 
-  const fetchGuests = async () => { const { data, error } = await supabase.from('guests').select('*').eq('event_id', id).order('name'); if (!error) setGuests(data || []); };
+  const fetchGuests = async (isInitialLoad = false) => {
+    const { data, error } = await supabase.from('guests').select('*').eq('event_id', id).order('name');
+    if (!error && data) {
+      // Detecta novos check-ins comparando com estado anterior
+      if (!isInitialLoad && previousGuestsRef.current.size > 0) {
+        data.forEach(guest => {
+          const wasCheckedIn = previousGuestsRef.current.get(guest.id);
+          if (guest.checked_in && !wasCheckedIn) {
+            // Novo check-in detectado!
+            setLiveCheckins(prev => [{
+              id: guest.id + '-' + Date.now(),
+              name: guest.name,
+              company: guest.company || '',
+              time: new Date()
+            }, ...prev].slice(0, 50)); // Mantém últimos 50
+          }
+        });
+      }
+      // Atualiza o mapa de referência
+      const newMap = new Map<string, boolean>();
+      data.forEach(g => newMap.set(g.id, g.checked_in));
+      previousGuestsRef.current = newMap;
+      setGuests(data);
+    }
+  };
   const fetchStaff = async () => { const { data, error } = await supabase.from('staff').select('*').eq('event_id', id).order('name'); if (!error) setStaff(data || []); };
   const fetchActivityLogs = async () => { if (!canAccessHistory) return; setLogsLoading(true); const { data, error } = await supabase.from('activity_logs').select('*').eq('event_id', id).order('created_at', { ascending: false }).limit(100); if (!error) setActivityLogs(data || []); setLogsLoading(false); };
-  const subscribeToGuests = () => { const channel = supabase.channel('guests-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'guests', filter: `event_id=eq.${id}` }, () => fetchGuests()).subscribe(); return () => { supabase.removeChannel(channel); }; };
+
+  const subscribeToGuests = () => {
+    const channel = supabase.channel('guests-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guests', filter: `event_id=eq.${id}` }, () => fetchGuests(false))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  };
   const subscribeToStaff = () => { const channel = supabase.channel('staff-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'staff', filter: `event_id=eq.${id}` }, () => fetchStaff()).subscribe(); return () => { supabase.removeChannel(channel); }; };
 
   const handleToggleCheckIn = async (guest: Guest) => {
@@ -623,6 +652,14 @@ export default function EventManagement() {
           <TabsList className="bg-card border border-border">
             <TabsTrigger value="guests">Convidados</TabsTrigger>
             <TabsTrigger value="staff">Equipe</TabsTrigger>
+            <TabsTrigger value="live" className="relative">
+              Ao Vivo
+              {liveCheckins.length > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full text-[10px] flex items-center justify-center text-white" style={{ backgroundColor: eventColor }}>
+                  {liveCheckins.length > 9 ? '9+' : liveCheckins.length}
+                </span>
+              )}
+            </TabsTrigger>
             {canAccessHistory && <TabsTrigger value="history">Histórico</TabsTrigger>}
             {canAccessSettings && <TabsTrigger value="settings">Configurações</TabsTrigger>}
           </TabsList>
@@ -705,6 +742,67 @@ export default function EventManagement() {
                 </div>
               ))}
             </div>
+          </TabsContent>
+
+          {/* ABA AO VIVO - Feed de check-ins em tempo real */}
+          <TabsContent value="live" className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full animate-pulse" style={{ backgroundColor: eventColor }} />
+                <h3 className="text-lg font-semibold text-foreground">Check-ins ao Vivo</h3>
+              </div>
+              {liveCheckins.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-white"
+                  onClick={() => setLiveCheckins([])}
+                >
+                  Limpar
+                </Button>
+              )}
+            </div>
+
+            {liveCheckins.length === 0 ? (
+              <div className="bg-card border border-border rounded-xl p-12 text-center">
+                <UserCheck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Aguardando check-ins...</p>
+                <p className="text-sm text-muted-foreground/70 mt-2">
+                  Os nomes aparecerão aqui em tempo real quando alguém fizer check-in no térreo.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {liveCheckins.map((checkin, index) => (
+                  <div
+                    key={checkin.id}
+                    className={`bg-card border rounded-xl p-4 flex items-center gap-4 transition-all ${index === 0 ? 'border-2 animate-pulse' : 'border-border'}`}
+                    style={index === 0 ? { borderColor: eventColor } : {}}
+                  >
+                    <div
+                      className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0"
+                      style={{ backgroundColor: eventColor }}
+                    >
+                      {checkin.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-foreground truncate">{checkin.name}</p>
+                      {checkin.company && (
+                        <p className="text-sm text-muted-foreground truncate">{checkin.company}</p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-mono" style={{ color: eventColor }}>
+                        {checkin.time.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {checkin.time.toLocaleTimeString('pt-BR', { second: '2-digit' }).split(':')[2]}s atrás
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {canAccessHistory && (
