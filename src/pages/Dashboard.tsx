@@ -39,7 +39,7 @@ export default function Dashboard() {
   const [newEventName, setNewEventName] = useState('');
   const [newEventDate, setNewEventDate] = useState('');
   const [creating, setCreating] = useState(false);
-  const [companySettings, setCompanySettings] = useState<CompanySettings>({
+  const [companySettings] = useState<CompanySettings>({
     name: 'Rooftop Floripa Square',
     logo_url: null,
     primary_color: '#f37021'
@@ -55,20 +55,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       fetchEvents();
-      fetchCompanySettings();
     }
   }, [user]);
-
-  const fetchCompanySettings = async () => {
-    const { data } = await supabase.from('company_settings').select('*').eq('id', 1).single();
-    if (data) {
-      setCompanySettings({
-        name: data.name || 'Rooftop Floripa Square',
-        logo_url: data.logo_url,
-        primary_color: data.primary_color || '#f37021'
-      });
-    }
-  };
 
   const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -76,18 +64,8 @@ export default function Dashboard() {
 
     setUploadingLogo(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `company-logo-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('event-images').upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
-
-      await supabase.from('company_settings').update({ logo_url: data.publicUrl }).eq('id', 1);
-
-      setCompanySettings(prev => ({ ...prev, logo_url: data.publicUrl }));
-      toast({ title: 'Sucesso', description: 'Logo atualizada!' });
+      // Logo upload functionality - would require company_settings table
+      toast({ title: 'Info', description: 'Funcionalidade de logo em desenvolvimento.' });
     } catch (error) {
       toast({ title: 'Erro', description: 'Falha ao enviar logo.', variant: 'destructive' });
     } finally {

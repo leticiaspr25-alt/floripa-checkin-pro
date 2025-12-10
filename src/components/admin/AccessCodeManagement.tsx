@@ -5,32 +5,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, KeyRound } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AccessCodeManagement() {
-  const [keys, setKeys] = useState({ admin: '', team: '', receptionist: '' });
+  const [keys, setKeys] = useState({ admin: '', equipe: '', recepcao: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  // Busca as chaves atuais do banco
   const fetchKeys = async () => {
-    const { data, error } = await supabase.from('access_keys').select('*');
+    const { data, error } = await supabase.from('access_codes').select('*');
     
     if (error) {
       toast({ title: "Erro", description: "Falha ao carregar chaves.", variant: "destructive" });
     } else if (data) {
-      const newKeys = { admin: '', team: '', receptionist: '' };
-      data.forEach((k: any) => {
-        if (k.key_type === 'admin') newKeys.admin = k.key_value;
-        if (k.key_type === 'team') newKeys.team = k.key_value;
-        if (k.key_type === 'receptionist') newKeys.receptionist = k.key_value;
+      const newKeys = { admin: '', equipe: '', recepcao: '' };
+      data.forEach((k) => {
+        if (k.role === 'admin') newKeys.admin = k.code;
+        if (k.role === 'equipe') newKeys.equipe = k.code;
+        if (k.role === 'recepcao') newKeys.recepcao = k.code;
       });
-      // Se vier vazio do banco, mantém os padrões para visualização
-      if (!newKeys.admin) newKeys.admin = 'MASTER_FLORIPA';
-      if (!newKeys.team) newKeys.team = 'EQUIPE_2025';
-      if (!newKeys.receptionist) newKeys.receptionist = 'RECEPCAO_EVENTO';
-      
       setKeys(newKeys);
     }
     setLoading(false);
@@ -43,15 +36,23 @@ export default function AccessCodeManagement() {
   const handleSave = async () => {
     setSaving(true);
     
+    // Update each code individually
     const updates = [
-      { key_type: 'admin', key_value: keys.admin },
-      { key_type: 'team', key_value: keys.team },
-      { key_type: 'receptionist', key_value: keys.receptionist }
+      { role: 'admin' as const, code: keys.admin },
+      { role: 'equipe' as const, code: keys.equipe },
+      { role: 'recepcao' as const, code: keys.recepcao }
     ];
 
-    const { error } = await supabase.from('access_keys').upsert(updates);
+    let hasError = false;
+    for (const update of updates) {
+      const { error } = await supabase
+        .from('access_codes')
+        .update({ code: update.code })
+        .eq('role', update.role);
+      if (error) hasError = true;
+    }
 
-    if (error) {
+    if (hasError) {
       toast({ title: "Erro", description: "Falha ao salvar.", variant: "destructive" });
     } else {
       toast({ title: "Sucesso", description: "Novos códigos de acesso salvos!" });
@@ -84,8 +85,8 @@ export default function AccessCodeManagement() {
         <div className="space-y-2">
           <Label className="text-foreground">Código da Equipe</Label>
           <Input 
-            value={keys.team} 
-            onChange={e => setKeys({...keys, team: e.target.value})} 
+            value={keys.equipe} 
+            onChange={e => setKeys({...keys, equipe: e.target.value})} 
             className="bg-secondary border-border font-mono" 
           />
           <p className="text-xs text-muted-foreground">Permite criar eventos e editar listas.</p>
@@ -94,8 +95,8 @@ export default function AccessCodeManagement() {
         <div className="space-y-2">
           <Label className="text-foreground">Código da Recepção</Label>
           <Input 
-            value={keys.receptionist} 
-            onChange={e => setKeys({...keys, receptionist: e.target.value})} 
+            value={keys.recepcao} 
+            onChange={e => setKeys({...keys, recepcao: e.target.value})} 
             className="bg-secondary border-border font-mono" 
           />
           <p className="text-xs text-muted-foreground">Apenas check-in e visualização (sem excluir).</p>
