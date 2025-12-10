@@ -206,6 +206,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_role_with_code: {
+        Args: { _user_id: string; _access_code: string }
+        Returns: Database["public"]["Enums"]["app_role"] | null
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
