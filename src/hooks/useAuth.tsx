@@ -89,24 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, displayName: string, accessCode: string) => {
     try {
-      // First validate the access code
-      const { data: codeData, error: codeError } = await supabase
-        .from('access_codes')
-        .select('role')
-        .eq('code', accessCode)
-        .maybeSingle();
-
-      if (codeError) {
-        console.error('Error validating access code:', codeError);
-        return { error: new Error('Erro ao validar código de acesso. Tente novamente.') };
-      }
-
-      if (!codeData) {
-        return { error: new Error('Código de acesso inválido. Verifique com o administrador.') };
-      }
-
-      const validatedRole = codeData.role as AppRole;
-
       const redirectUrl = `${window.location.origin}/`;
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -121,14 +103,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: signUpError as Error };
       }
 
-      // Assign role to user
+      // Assign role using secure server-side function
+      // This validates the access code and assigns the role in one atomic operation
       if (authData.user) {
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: authData.user.id, role: validatedRole });
+        const { data: assignedRole, error: roleError } = await supabase
+          .rpc('assign_role_with_code', {
+            _user_id: authData.user.id,
+            _access_code: accessCode
+          });
 
         if (roleError) {
           console.error('Error assigning role:', roleError);
+          return { error: new Error('Erro ao validar código de acesso. Tente novamente.') };
+        }
+
+        if (!assignedRole) {
+          // Invalid access code - the function returned NULL
+          return { error: new Error('Código de acesso inválido. Verifique com o administrador.') };
         }
 
         // Update profile with display name
