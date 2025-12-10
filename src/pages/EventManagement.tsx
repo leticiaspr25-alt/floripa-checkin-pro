@@ -29,6 +29,11 @@ interface Event {
   wifi_img_url: string | null;
   photo_url: string | null;
   photo_img_url: string | null;
+  event_logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  tertiary_color: string | null;
+  event_logo_size: number | null;
 }
 
 interface Guest {
@@ -48,7 +53,13 @@ interface ActivityLog {
   details: string | null;
 }
 
-// Staff interface removed - table doesn't exist in database
+interface Staff {
+  id: string;
+  name: string;
+  role: string | null;
+  checked_in: boolean;
+  checkin_time: string | null;
+}
 
 // --- FUNÇÃO PARA NORMALIZAR TEXTO (remover acentos para busca) ---
 const normalizeText = (text: string): string => {
@@ -159,6 +170,16 @@ export default function EventManagement() {
   const [guestToEdit, setGuestToEdit] = useState<Guest | null>(null);
   const [editFormData, setEditFormData] = useState({ name: '', company: '', role: '' });
 
+  // Estados para Equipe
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [staffSearchTerm, setStaffSearchTerm] = useState('');
+  const [addStaffOpen, setAddStaffOpen] = useState(false);
+  const [newStaff, setNewStaff] = useState({ name: '', role: '' });
+  const [editStaffOpen, setEditStaffOpen] = useState(false);
+  const [staffToEdit, setStaffToEdit] = useState<Staff | null>(null);
+  const [editStaffFormData, setEditStaffFormData] = useState({ name: '', role: '' });
+  const [previewStaff, setPreviewStaff] = useState<Staff | null>(null);
+
   // Feed ao vivo de check-ins
   interface LiveCheckIn {
     id: string;
@@ -170,7 +191,8 @@ export default function EventManagement() {
   const previousGuestsRef = useRef<Map<string, boolean>>(new Map());
 
   const [eventSettings, setEventSettings] = useState({
-    name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: ''
+    name: '', date: '', wifi_ssid: '', wifi_pass: '', photo_url: '', wifi_img_url: '', photo_img_url: '',
+    event_logo_url: '', primary_color: '#f37021', secondary_color: '', tertiary_color: '', event_logo_size: 150
   });
 
   const canImportExport = isAdmin || isEquipe;
@@ -185,17 +207,20 @@ export default function EventManagement() {
   };
 
   useEffect(() => { if (!authLoading && !user) navigate('/auth'); }, [user, authLoading, navigate]);
-  useEffect(() => { if (id && user) { fetchEvent(); fetchGuests(true); subscribeToGuests(); } }, [id, user]);
+  useEffect(() => { if (id && user) { fetchEvent(); fetchGuests(true); fetchStaff(); subscribeToGuests(); subscribeToStaff(); } }, [id, user]);
 
   const fetchEvent = async () => {
-    const { data, error } = await supabase.from('events').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
     if (error || !data) { toast({ title: 'Erro', description: 'Evento não encontrado.', variant: 'destructive' }); navigate('/dashboard'); }
     else {
       setEvent(data);
       setEventSettings({
         name: data.name, date: new Date(data.date).toISOString().slice(0, 16),
         wifi_ssid: data.wifi_ssid || '', wifi_pass: data.wifi_pass || '',
-        photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', photo_img_url: data.photo_img_url || ''
+        photo_url: data.photo_url || '', wifi_img_url: data.wifi_img_url || '', photo_img_url: data.photo_img_url || '',
+        event_logo_url: data.event_logo_url || '', primary_color: data.primary_color || '#f37021',
+        secondary_color: data.secondary_color || '', tertiary_color: data.tertiary_color || '',
+        event_logo_size: data.event_logo_size || 150
       });
     }
     setLoading(false);
@@ -226,6 +251,7 @@ export default function EventManagement() {
       setGuests(data);
     }
   };
+  const fetchStaff = async () => { const { data, error } = await supabase.from('staff').select('*').eq('event_id', id).order('name'); if (!error) setStaff(data || []); };
   const fetchActivityLogs = async () => { if (!canAccessHistory) return; setLogsLoading(true); const { data, error } = await supabase.from('activity_logs').select('*').eq('event_id', id).order('created_at', { ascending: false }).limit(100); if (!error) setActivityLogs(data || []); setLogsLoading(false); };
 
   const subscribeToGuests = () => {
@@ -234,6 +260,7 @@ export default function EventManagement() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   };
+  const subscribeToStaff = () => { const channel = supabase.channel('staff-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'staff', filter: `event_id=eq.${id}` }, () => fetchStaff()).subscribe(); return () => { supabase.removeChannel(channel); }; };
 
   const handleToggleCheckIn = async (guest: Guest) => {
     const newCheckedIn = !guest.checked_in;
@@ -300,6 +327,44 @@ export default function EventManagement() {
 
   const handleDeleteGuest = async (guest: Guest) => { if (!canDeleteGuests) return; const { error } = await supabase.from('guests').delete().eq('id', guest.id); if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' }); else { await logActivity('Excluiu', `${guest.name}`); await fetchGuests(); } };
 
+  // --- FUNÇÕES STAFF ---
+  const handleToggleStaffCheckIn = async (s: Staff) => {
+    const newCheckedIn = !s.checked_in;
+    const checkinTime = newCheckedIn ? new Date().toISOString() : null;
+    setStaff(prev => prev.map(st => st.id === s.id ? { ...st, checked_in: newCheckedIn, checkin_time: checkinTime } : st));
+    const { error } = await supabase.from('staff').update({ checked_in: newCheckedIn, checkin_time: checkinTime }).eq('id', s.id);
+    if (error) {
+      setStaff(prev => prev.map(st => st.id === s.id ? { ...st, checked_in: s.checked_in, checkin_time: s.checkin_time } : st));
+      toast({ title: 'Erro', description: 'Falha ao atualizar.', variant: 'destructive' });
+    } else {
+      logActivity(newCheckedIn ? 'Check-in Equipe' : 'Check-out Equipe', s.name);
+    }
+  };
+
+  const handleAddStaff = async (e: React.FormEvent) => {
+    e.preventDefault(); setAdding(true);
+    const { error } = await supabase.from('staff').insert({ event_id: id, name: newStaff.name, role: newStaff.role || null });
+    if (error) toast({ title: 'Erro', description: 'Falha ao adicionar.', variant: 'destructive' });
+    else { toast({ title: 'Sucesso', description: 'Membro da equipe adicionado!' }); await logActivity('Adicionou Equipe', `${newStaff.name}`); await fetchStaff(); setAddStaffOpen(false); setNewStaff({ name: '', role: '' }); }
+    setAdding(false);
+  };
+
+  const handleSaveEditStaff = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!staffToEdit) return; setAdding(true);
+    const { error } = await supabase.from('staff').update({ name: editStaffFormData.name, role: editStaffFormData.role || null }).eq('id', staffToEdit.id);
+    if (error) toast({ title: 'Erro', description: 'Falha ao editar.', variant: 'destructive' });
+    else { toast({ title: 'Sucesso', description: 'Membro atualizado!' }); await logActivity('Editou Equipe', `${editStaffFormData.name}`); await fetchStaff(); setEditStaffOpen(false); setStaffToEdit(null); }
+    setAdding(false);
+  };
+
+  const handleDeleteStaff = async (s: Staff) => {
+    if (!canDeleteGuests) return;
+    const { error } = await supabase.from('staff').delete().eq('id', s.id);
+    if (error) toast({ title: 'Erro', description: 'Falha ao excluir.', variant: 'destructive' });
+    else { await logActivity('Excluiu Equipe', `${s.name}`); await fetchStaff(); }
+  };
+
+  const handleOpenStaffPreview = (s: Staff) => { setPreviewStaff(s); };
   const handleOpenPreview = (guest: Guest) => { setPreviewGuest(guest); };
 
   // Função de impressão via iframe - mais confiável
@@ -402,6 +467,16 @@ export default function EventManagement() {
     };
   };
 
+  const handleConfirmStaffPrint = () => {
+    if (!previewStaff) return;
+    const name = formatNameForBadge(previewStaff.name);
+    const role = previewStaff.role || 'Equipe';
+    setPreviewStaff(null);
+    setTimeout(() => {
+      printViaIframe(name, role);
+    }, 100);
+  };
+
   const handleConfirmPrint = () => {
     if (!previewGuest) return;
     const name = formatNameForBadge(previewGuest.name);
@@ -440,7 +515,10 @@ export default function EventManagement() {
     const { error } = await supabase.from('events').update({
       name: eventSettings.name, date: new Date(eventSettings.date).toISOString(),
       wifi_ssid: eventSettings.wifi_ssid || null, wifi_pass: eventSettings.wifi_pass || null,
-      photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null, photo_img_url: eventSettings.photo_img_url || null
+      photo_url: eventSettings.photo_url || null, wifi_img_url: eventSettings.wifi_img_url || null, photo_img_url: eventSettings.photo_img_url || null,
+      event_logo_url: eventSettings.event_logo_url || null, primary_color: eventSettings.primary_color || '#f37021',
+      secondary_color: eventSettings.secondary_color || null, tertiary_color: eventSettings.tertiary_color || null,
+      event_logo_size: eventSettings.event_logo_size || 150
     }).eq('id', id);
     if (error) toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' }); else { toast({ title: 'Sucesso', description: 'Salvo!' }); await logActivity('Atualizou configurações', 'Alterações salvas'); fetchEvent(); }
     setSaving(false);
@@ -450,10 +528,15 @@ export default function EventManagement() {
     .filter(g => normalizeText(g.name).includes(normalizeText(searchTerm)) || normalizeText(g.company || '').includes(normalizeText(searchTerm)))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
+  const filteredStaff = staff
+    .filter(s => normalizeText(s.name).includes(normalizeText(staffSearchTerm)) || normalizeText(s.role || '').includes(normalizeText(staffSearchTerm)))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
   const formatLogTime = (ts: string) => new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-  // Event accent color
-  const eventColor = '#f37021';
+  // Cores do evento
+  const eventColor = eventSettings.primary_color || '#f37021';
+  const secondaryColor = eventSettings.secondary_color || eventColor; // Fallback para primária
 
   if (authLoading || loading) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
@@ -564,7 +647,7 @@ export default function EventManagement() {
             background-color: ${eventColor} !important;
           }
           .event-tabs button[role="switch"][data-state="checked"] {
-            background-color: ${eventColor} !important;
+            background-color: ${secondaryColor} !important;
           }
           .event-tabs button.inline-flex:hover:not([role="switch"]):not([data-state]) {
             background-color: ${eventColor}20 !important;
@@ -593,6 +676,7 @@ export default function EventManagement() {
         <Tabs defaultValue="guests" className="space-y-6 event-tabs" onValueChange={(v) => { if(v === 'history') fetchActivityLogs(); }}>
           <TabsList className="bg-card border border-border">
             <TabsTrigger value="guests">Convidados</TabsTrigger>
+            <TabsTrigger value="staff">Equipe</TabsTrigger>
             <TabsTrigger value="live" className="relative">
               Ao Vivo
               {liveCheckins.length > 0 && (
@@ -617,6 +701,71 @@ export default function EventManagement() {
             </div>
             <div className="space-y-3">
               {filteredGuests.length===0?<div className="text-center py-12 text-muted-foreground">Nenhum convidado encontrado.</div>:filteredGuests.map((g,i)=>(<div key={g.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{animationDelay:`${i*30}ms`}}><div className="flex-1 min-w-0"><div className="flex items-center gap-3"><h3 className="font-semibold text-foreground truncate">{g.name}</h3>{g.checked_in&&<Badge style={{ backgroundColor: eventColor }} className="text-white">Presente</Badge>}</div>{(g.role||g.company)&&<p className="text-sm text-muted-foreground mt-1 truncate">{[g.role,g.company].filter(Boolean).join(' • ')}</p>}</div><div className="flex items-center gap-3 shrink-0">{canEditGuests && <Button variant="ghost" size="icon" onClick={() => { setGuestToEdit(g); setEditFormData({ name: g.name, company: g.company || '', role: g.role || '' }); setEditGuestOpen(true); }}><Pencil className="h-4 w-4"/></Button>}<Button variant="ghost" size="icon" onClick={()=>handleOpenPreview(g)}><Printer className="h-4 w-4"/></Button>{canDeleteGuests&&<Button variant="ghost" size="icon" onClick={()=>handleDeleteGuest(g)} className="hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>}<Switch checked={g.checked_in} onCheckedChange={()=>handleToggleCheckIn(g)}/></div></div>))}
+            </div>
+          </TabsContent>
+
+          {/* ABA Equipe */}
+          <TabsContent value="staff" className="space-y-6 animate-fade-in">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-card border border-border rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-2"><HardHat className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Total Equipe</span></div>
+                <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.length}</p>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-2"><UserCheck className="h-5 w-5 text-muted-foreground" /><span className="text-muted-foreground text-sm font-medium">Presentes</span></div>
+                <p className="text-5xl font-bold" style={{ color: eventColor }}>{staff.filter(s => s.checked_in).length}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar na equipe..." value={staffSearchTerm} onChange={(e) => setStaffSearchTerm(e.target.value)} className="pl-10 bg-card border-border" />
+              </div>
+              <Dialog open={addStaffOpen} onOpenChange={setAddStaffOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="border-border"><Plus className="h-4 w-4 mr-2" />Adicionar</Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-border">
+                  <DialogHeader><DialogTitle>Adicionar Membro da Equipe</DialogTitle></DialogHeader>
+                  <form onSubmit={handleAddStaff} className="space-y-4 mt-4">
+                    <Input placeholder="Nome" value={newStaff.name} onChange={e => setNewStaff({ ...newStaff, name: e.target.value })} required className="bg-secondary border-border" />
+                    <Input placeholder="Função (ex: Recepção, Audiovisual)" value={newStaff.role} onChange={e => setNewStaff({ ...newStaff, role: e.target.value })} className="bg-secondary border-border" />
+                    <Button type="submit" className="w-full bg-primary" disabled={adding}>Adicionar</Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div className="space-y-3">
+              {filteredStaff.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">Nenhum membro da equipe encontrado.</div>
+              ) : filteredStaff.map((s, i) => (
+                <div key={s.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-4 animate-fade-in" style={{ animationDelay: `${i * 30}ms` }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-semibold text-foreground truncate">{s.name}</h3>
+                      <Badge style={{ backgroundColor: eventColor }} className="text-white">Equipe</Badge>
+                      {s.checked_in && <Badge style={{ backgroundColor: eventColor }} className="text-white">Presente</Badge>}
+                    </div>
+                    {s.role && <p className="text-sm text-muted-foreground mt-1 truncate">{s.role}</p>}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {canEditGuests && (
+                      <Button variant="ghost" size="icon" onClick={() => { setStaffToEdit(s); setEditStaffFormData({ name: s.name, role: s.role || '' }); setEditStaffOpen(true); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" onClick={() => handleOpenStaffPreview(s)}>
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                    {canDeleteGuests && (
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteStaff(s)} className="hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Switch checked={s.checked_in} onCheckedChange={() => handleToggleStaffCheckIn(s)} />
+                  </div>
+                </div>
+              ))}
             </div>
           </TabsContent>
 
@@ -881,6 +1030,17 @@ export default function EventManagement() {
           </DialogContent>
         </Dialog>
 
+        {/* MODAL EDITAR STAFF */}
+        <Dialog open={editStaffOpen} onOpenChange={setEditStaffOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Editar Membro da Equipe</DialogTitle></DialogHeader>
+            <form onSubmit={handleSaveEditStaff} className="space-y-4 mt-4">
+              <div className="space-y-2"><Label>Nome *</Label><Input value={editStaffFormData.name} onChange={(e) => setEditStaffFormData({ ...editStaffFormData, name: e.target.value })} required className="bg-secondary border-border" /></div>
+              <div className="space-y-2"><Label>Função</Label><Input value={editStaffFormData.role} onChange={(e) => setEditStaffFormData({ ...editStaffFormData, role: e.target.value })} placeholder="Ex: Recepção, Audiovisual" className="bg-secondary border-border" /></div>
+              <Button type="submit" className="w-full bg-primary" disabled={adding}>Salvar Alterações</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* MODAL PREVIEW DA ETIQUETA - ESTILO BARTENDER COM AJUSTES */}
         <Dialog open={!!previewGuest} onOpenChange={(open) => !open && setPreviewGuest(null)}>
@@ -1075,6 +1235,102 @@ export default function EventManagement() {
           </DialogContent>
         </Dialog>
 
+        {/* MODAL PREVIEW DA ETIQUETA STAFF - ESTILO BARTENDER */}
+        <Dialog open={!!previewStaff} onOpenChange={(open) => !open && setPreviewStaff(null)}>
+          <DialogContent className="bg-[#1e1e1e] border-[#333] max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-white">
+                <HardHat className="h-5 w-5" style={{ color: eventColor }} />
+                Preview da Etiqueta - Equipe
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-[#0d0d0d] rounded-lg p-4">
+                <div className="flex justify-between text-[9px] text-gray-600 mb-1 font-mono" style={{ width: '340px', margin: '0 auto' }}>
+                  <span>|0</span>
+                  <span>45|</span>
+                  <span>90mm|</span>
+                </div>
+                <div className="flex justify-center">
+                  <div className="relative" style={{ width: '340px', height: '132px' }}>
+                    <div className="absolute inset-0 bg-black/40 rounded" style={{ transform: 'translate(3px, 3px)' }} />
+                    <div className="relative bg-white rounded overflow-hidden border border-gray-300" style={{ width: '340px', height: '132px' }}>
+                      <div className="w-full h-full flex flex-col justify-center items-center text-center" style={{ padding: '0 11px' }}>
+                        <div
+                          style={{
+                            width: '100%',
+                            fontFamily: "'Inter', Arial, sans-serif",
+                            fontWeight: 800,
+                            fontSize: `${nameFontSize * 1.24}px`,
+                            lineHeight: 1.1,
+                            marginBottom: '6px',
+                            color: '#000000',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {previewStaff ? formatNameForBadge(previewStaff.name) : ''}
+                        </div>
+                        <div
+                          style={{
+                            width: '100%',
+                            fontFamily: "'Inter', Arial, sans-serif",
+                            fontWeight: 500,
+                            fontSize: `${companyFontSize * 1.2}px`,
+                            lineHeight: 1.2,
+                            color: '#000000',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {previewStaff?.role || 'Equipe'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-center gap-3 mt-2 text-[10px] text-gray-500">
+                  <span style={{ color: eventColor }}>Equipe</span>
+                  <span>•</span>
+                  <span>90mm × 35mm</span>
+                </div>
+              </div>
+
+              {/* CONTROLES DE AJUSTE DE FONTE */}
+              <div className="bg-[#252525] rounded-lg p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-300 flex items-center gap-2"><Type className="h-4 w-4" />Ajustar Fontes</span>
+                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white h-7 px-2" onClick={() => { setNameFontSize(17); setCompanyFontSize(10); }}>
+                    <RotateCcw className="h-3 w-3 mr-1" />Reset
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Nome</span><span className="text-xs font-mono" style={{ color: eventColor }}>{nameFontSize}pt</span></div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]" onClick={() => setNameFontSize(Math.max(10, nameFontSize - 1))}><Minus className="h-3 w-3" /></Button>
+                    <Slider value={[nameFontSize]} onValueChange={(v) => setNameFontSize(v[0])} min={10} max={28} step={1} className="flex-1" />
+                    <Button variant="outline" size="icon" className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]" onClick={() => setNameFontSize(Math.min(28, nameFontSize + 1))}><PlusIcon className="h-3 w-3" /></Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between"><span className="text-xs text-gray-400">Função</span><span className="text-xs font-mono" style={{ color: eventColor }}>{companyFontSize}pt</span></div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]" onClick={() => setCompanyFontSize(Math.max(6, companyFontSize - 1))}><Minus className="h-3 w-3" /></Button>
+                    <Slider value={[companyFontSize]} onValueChange={(v) => setCompanyFontSize(v[0])} min={6} max={18} step={1} className="flex-1" />
+                    <Button variant="outline" size="icon" className="h-7 w-7 border-[#444] text-gray-400 hover:text-white hover:bg-[#333]" onClick={() => setCompanyFontSize(Math.min(18, companyFontSize + 1))}><PlusIcon className="h-3 w-3" /></Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 border-[#444] text-gray-300 hover:bg-[#333] hover:text-white" onClick={() => setPreviewStaff(null)}>Cancelar</Button>
+                <Button className="flex-1 text-white font-semibold" style={{ backgroundColor: eventColor }} onClick={handleConfirmStaffPrint}><Printer className="h-4 w-4 mr-2" />Imprimir</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
